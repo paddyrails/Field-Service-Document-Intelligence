@@ -2,7 +2,7 @@
 
 ## Overview
 
-An AI-powered assistant for **RiteCare** field service operations. Field officers and customer support staff interact via **Slack**. Messages are processed by a **PydanticAI** agent that uses **MCP tools** to call RiteCare microservices and perform **RAG** over domain documents, reasons with **OpenAI GPT-4o-mini**, persists data in **MongoDB Atlas**, and responds back to Slack.
+An AI-powered assistant for **RiteCare** field service operations. Field officers and customer support staff interact via **Slack**. Messages are processed by a **LangGraph** agent that uses **MCP tools** to call RiteCare microservices and perform **RAG** over domain documents, reasons with **OpenAI GPT-4o-mini**, persists data in **MongoDB Atlas**, and responds back to Slack.
 
 ---
 
@@ -11,7 +11,7 @@ An AI-powered assistant for **RiteCare** field service operations. Field officer
 ```
 Slack Message
     → Python Slack Gateway (FastAPI)
-    → PydanticAI Agent
+    → LangGraph Agent
         → MCP Tools (@tool)
             ├── RiteCare Microservices (FastAPI) → MongoDB Atlas (CRUD)
             └── RAG Tools → MongoDB Atlas Vector Search (semantic search)
@@ -49,7 +49,7 @@ Document Upload (offline / async)
 |-------|-----------|
 | Language | Python 3.12 |
 | Microservices | FastAPI |
-| AI Orchestration | PydanticAI |
+| AI Orchestration | LangGraph |
 | Tool Protocol | MCP (Model Context Protocol) |
 | LLM | OpenAI GPT-4o-mini |
 | Embeddings | OpenAI text-embedding-3-small |
@@ -118,8 +118,13 @@ Field-Service-Document-Intelligence/
 │
 ├── agent/
 │   ├── __init__.py
-│   ├── agent.py                     # PydanticAI Agent definition + system prompt
-│   ├── dependencies.py              # Agent runtime dependencies (httpx, db)
+│   ├── graph.py                     # LangGraph StateGraph definition + compilation
+│   ├── state.py                     # AgentState TypedDict
+│   ├── nodes/
+│   │   ├── __init__.py
+│   │   ├── intent_classifier.py     # LLM node: classify query → BU context
+│   │   ├── tool_executor.py         # Node: invoke MCP tools
+│   │   └── responder.py             # LLM node: compose final response
 │   └── prompts/
 │       ├── __init__.py
 │       └── system_prompt.py         # RiteCare-aware system prompt template
@@ -283,7 +288,7 @@ User query
     → embed query (text-embedding-3-small)
     → vector_dao.search(query_vector, top_k=5)   (cosine similarity)
     → top-K chunks returned as context
-    → injected into PydanticAI agent alongside CRUD tool results
+    → injected into LangGraph agent alongside CRUD tool results
     → LLM reasons over combined context → response
 ```
 
@@ -418,39 +423,42 @@ Each microservice is built in this order per repo:
 
 ---
 
-### Phase 4 — PydanticAI Agent (Main Repo)
-**Goal:** Fully working AI agent that receives a user query, selects the right CRUD and/or RAG MCP tools, combines results, persists the conversation, and returns an intelligent response.
+### Phase 4 — LangGraph Agent (Main Repo)
+**Goal:** Fully working AI agent that receives a user query, routes through a state graph, selects the right CRUD and/or RAG MCP tools, combines results, persists the conversation, and returns an intelligent response.
 
+- [ ] `agent/state.py` — `AgentState` TypedDict (messages, intent, tool_calls, tool_results, session_id, channel)
 - [ ] `agent/prompts/system_prompt.py` — RiteCare-aware system prompt (BU context, tool guidance, RAG instructions)
-- [ ] `agent/dependencies.py` — `AgentDeps` dataclass (httpx client, MongoDB session, user context)
-- [ ] `agent/agent.py` — PydanticAI `Agent` definition:
-  - Model: `openai:gpt-4o-mini`
-  - MCP servers: attach `mcp/server.py` (all CRUD + RAG tools)
-  - Result type: `str` (natural language response)
-  - System prompt: loaded from `prompts/system_prompt.py`
+- [ ] `agent/nodes/intent_classifier.py` — LLM node: classify query to BU1/BU2/BU3/BU4 + determine CRUD vs RAG
+- [ ] `agent/nodes/tool_executor.py` — node: invoke MCP tools based on intent, collect results
+- [ ] `agent/nodes/responder.py` — LLM node: synthesise tool results into natural language response
+- [ ] `agent/graph.py` — wire nodes + conditional edges into LangGraph `StateGraph`, compile
 - [ ] Persist conversation turns to MongoDB (`db/models/conversation.py`)
 
-**How PydanticAI works here:**
+**How LangGraph works here:**
 ```python
-agent = Agent(
-    model="openai:gpt-4o-mini",
-    mcp_servers=[mcp_server],
-    deps_type=AgentDeps,
-    system_prompt=SYSTEM_PROMPT,
-)
+graph = StateGraph(AgentState)
+graph.add_node("classify", intent_classifier)
+graph.add_node("execute_tools", tool_executor)
+graph.add_node("respond", responder)
 
-async with agent.run_mcp_servers():
-    result = await agent.run(user_query, deps=deps)
+graph.set_entry_point("classify")
+graph.add_edge("classify", "execute_tools")
+graph.add_edge("execute_tools", "respond")
+graph.add_edge("respond", END)
+
+agent = graph.compile()
+result = await agent.ainvoke({"messages": [user_query], "session_id": session_id})
 ```
-The agent automatically selects CRUD tools, RAG tools, or both based on the query — no manual routing needed.
 
 **Example combined flow:**
 ```
 Query: "How do I fix the pressure fault on customer C123's pump unit?"
-    → search_service_manuals("pressure fault pump")    [RAG → BU2 manual chunks]
-    → get_ticket(customer_id="C123", type="pressure")  [CRUD → BU4 open tickets]
-    → search_resolved_tickets("pressure fault pump")   [RAG → BU4 past solutions]
-    → LLM synthesises all results → actionable response
+  → classify:       intent=BU2+BU4, mode=CRUD+RAG
+  → execute_tools:
+      search_service_manuals("pressure fault pump")    [RAG → BU2]
+      get_ticket(customer_id="C123", type="pressure")  [CRUD → BU4]
+      search_resolved_tickets("pressure fault pump")   [RAG → BU4]
+  → respond:        LLM synthesises all results → actionable response
 ```
 
 **Exit criteria:** Agent handles queries requiring CRUD only, RAG only, and combined CRUD + RAG. Conversation persisted to MongoDB.
@@ -461,8 +469,8 @@ Query: "How do I fix the pressure fault on customer C123's pump unit?"
 **Goal:** Connect everything to Slack.
 
 - [ ] `slack_gateway/main.py` — Slack Bolt app
-- [ ] `slack_gateway/handlers.py` — message event handler → PydanticAI agent
-- [ ] `slack_gateway/channel_router.py` — route by channel to inject BU context into system prompt
+- [ ] `slack_gateway/handlers.py` — message event handler → LangGraph agent
+- [ ] `slack_gateway/channel_router.py` — route by channel to inject BU context into AgentState
 - [ ] Docker-compose update to include gateway service
 - [ ] End-to-end test: Slack message → agent → response in Slack thread
 
@@ -513,7 +521,9 @@ ENV=development
 [project]
 dependencies = [
     # AI Orchestration
-    "pydantic-ai[openai]>=0.0.14",   # PydanticAI with OpenAI support
+    "langgraph>=0.2",                 # LangGraph agent framework
+    "langchain-openai>=0.2",          # OpenAI LLM + embeddings via LangChain
+    "langchain-core>=0.3",            # LangChain base primitives
 
     # MCP
     "mcp>=1.0",                       # MCP protocol + FastMCP server
@@ -596,5 +606,5 @@ dev = [
 | Phase 1 — Foundation (Main Repo) | Not started |
 | Phase 2 — MongoDB Models (Main Repo) | Not started |
 | Phase 3 — RiteCare Microservices (BU1–BU4) | Not started |
-| Phase 4 — PydanticAI Agent | Not started |
+| Phase 4 — LangGraph Agent | Not started |
 | Phase 5 — Slack Gateway | Deferred |
