@@ -2,7 +2,7 @@
 
 ## Overview
 
-An AI-powered assistant for **RiteCare** field service operations. Field officers and customer support staff interact via **Slack**. Messages are processed by a **LangGraph** agent that uses **MCP tools** to call RiteCare microservices, reasons with **OpenAI GPT-4o-mini**, persists data in **MongoDB Atlas**, and responds back to Slack.
+An AI-powered assistant for **RiteCare** field service operations. Field officers and customer support staff interact via **Slack**. Messages are processed by a **PydanticAI** agent that uses **MCP tools** to call RiteCare microservices and perform **RAG** over domain documents, reasons with **OpenAI GPT-4o-mini**, persists data in **MongoDB Atlas**, and responds back to Slack.
 
 ---
 
@@ -11,22 +11,27 @@ An AI-powered assistant for **RiteCare** field service operations. Field officer
 ```
 Slack Message
     → Python Slack Gateway (FastAPI)
-    → LangGraph Agent
+    → PydanticAI Agent
         → MCP Tools (@tool)
-            → RiteCare Microservices (FastAPI)
-                → MongoDB Atlas
+            ├── RiteCare Microservices (FastAPI) → MongoDB Atlas (CRUD)
+            └── RAG Tools → MongoDB Atlas Vector Search (semantic search)
     → LLM (OpenAI GPT-4o-mini)
     → Response back to Slack
+
+Document Upload (offline / async)
+    → Document Ingestion Pipeline (per BU)
+        → Chunking + Embedding (OpenAI text-embedding-3-small)
+        → MongoDB Atlas Vector Search index
 ```
 
 ### RiteCare Business Units
 
-| Unit | Microservice | Responsibility |
-|------|-------------|----------------|
-| BU1  | Customer Onboarding | New customer registration, KYC, account setup |
-| BU2  | Sales & Maintenance | Service contracts, field visits, maintenance schedules |
-| BU3  | Billing & Subscription | Invoices, subscription plans, payment tracking |
-| BU4  | Support & Fulfillment | Tickets, SLAs, parts fulfillment, escalations |
+| Unit | Microservice | Responsibility | RAG Documents |
+|------|-------------|----------------|---------------|
+| BU1  | Customer Onboarding | New customer registration, KYC, account setup | KYC forms, ID scans, onboarding checklists |
+| BU2  | Sales & Maintenance | Service contracts, field visits, maintenance schedules | Equipment manuals, service procedures, contract PDFs |
+| BU3  | Billing & Subscription | Invoices, subscription plans, payment tracking | Invoice PDFs, billing statements, plan documents |
+| BU4  | Support & Fulfillment | Tickets, SLAs, parts fulfillment, escalations | KB articles, resolved ticket history, troubleshooting guides |
 
 ### Slack Back-Office Channels
 
@@ -44,9 +49,11 @@ Slack Message
 |-------|-----------|
 | Language | Python 3.12 |
 | Microservices | FastAPI |
-| AI Orchestration | LangGraph |
+| AI Orchestration | PydanticAI |
 | Tool Protocol | MCP (Model Context Protocol) |
 | LLM | OpenAI GPT-4o-mini |
+| Embeddings | OpenAI text-embedding-3-small |
+| Vector Search | MongoDB Atlas Vector Search |
 | Database | MongoDB Atlas (Motor async driver) |
 | Data Validation | Pydantic v2 |
 | Package Manager | uv (pyproject.toml) |
@@ -79,31 +86,27 @@ Field-Service-Document-Intelligence/
 │
 ├── agent/
 │   ├── __init__.py
-│   ├── graph.py                     # LangGraph graph definition
-│   ├── state.py                     # Agent state (TypedDict)
-│   ├── nodes/
-│   │   ├── __init__.py
-│   │   ├── intent_classifier.py     # Classify user intent → correct BU
-│   │   ├── tool_executor.py         # Execute MCP tools
-│   │   └── responder.py             # Format final response
+│   ├── agent.py                     # PydanticAI Agent definition + system prompt
+│   ├── dependencies.py              # Agent runtime dependencies (httpx, db)
 │   └── prompts/
 │       ├── __init__.py
-│       └── system_prompt.py         # LLM system prompt templates
+│       └── system_prompt.py         # RiteCare-aware system prompt template
 │
 ├── mcp/
 │   ├── __init__.py
-│   ├── server.py                    # MCP server entry point
+│   ├── server.py                    # MCP server entry point (FastMCP)
 │   └── tools/
 │       ├── __init__.py
-│       ├── bu1_tools.py             # @tool wrappers → BU1 API
-│       ├── bu2_tools.py             # @tool wrappers → BU2 API
-│       ├── bu3_tools.py             # @tool wrappers → BU3 API
-│       └── bu4_tools.py             # @tool wrappers → BU4 API
+│       ├── bu1_tools.py             # CRUD @tools → BU1 API
+│       ├── bu2_tools.py             # CRUD @tools → BU2 API
+│       ├── bu3_tools.py             # CRUD @tools → BU3 API
+│       ├── bu4_tools.py             # CRUD @tools → BU4 API
+│       └── rag_tools.py             # RAG @tools → Atlas Vector Search (all BUs)
 │
 ├── db/
 │   ├── __init__.py
 │   ├── client.py                    # MongoDB Atlas Motor client (singleton)
-│   ├── collections.py               # Collection name constants
+│   ├── collections.py               # Collection name constants (CRUD + vector)
 │   └── models/
 │       ├── __init__.py
 │       └── conversation.py          # Agent conversation history model
@@ -126,7 +129,8 @@ Field-Service-Document-Intelligence/
 ├── tests/
 │   ├── conftest.py
 │   ├── unit/
-│   │   └── test_mcp_tools.py
+│   │   ├── test_mcp_tools.py
+│   │   └── test_rag_tools.py
 │   ├── integration/
 │   │   └── test_agent.py
 │   └── e2e/
@@ -147,6 +151,7 @@ Field-Service-Document-Intelligence/
 ### BU Microservice Repos — Layered Architecture (repeated × 4)
 
 Each BU repo follows a **strict 4-layer architecture**: `api → service → dao → common`.
+An `ingestion/` module handles document processing and vector indexing for RAG.
 
 ```
 ritecare-bu{N}-{name}/
@@ -163,13 +168,25 @@ ritecare-bu{N}-{name}/
 │
 ├── dao/                             # Layer 3 — Data Access Objects
 │   ├── __init__.py
-│   └── {domain}_dao.py              # All MongoDB queries via Motor
+│   ├── {domain}_dao.py              # All MongoDB CRUD queries via Motor
+│   └── vector_dao.py                # MongoDB Atlas Vector Search queries
+│
+├── ingestion/                       # Document ingestion pipeline (async / offline)
+│   ├── __init__.py
+│   ├── chunker.py                   # Split documents into chunks
+│   ├── embedder.py                  # Call OpenAI text-embedding-3-small
+│   ├── pipeline.py                  # Orchestrate chunker → embedder → vector_dao
+│   └── loaders/
+│       ├── __init__.py
+│       ├── pdf_loader.py            # Load & extract text from PDFs
+│       └── text_loader.py           # Load plain text / markdown docs
 │
 ├── common/                          # Layer 4 — Shared within this microservice
 │   ├── __init__.py
 │   ├── models/                      # MongoDB document models (Motor/Pydantic)
 │   │   ├── __init__.py
-│   │   └── {domain}.py
+│   │   ├── {domain}.py              # CRUD document model
+│   │   └── document_chunk.py        # Vector chunk model (text, embedding, metadata)
 │   ├── schemas/                     # Pydantic request/response schemas (API DTOs)
 │   │   ├── __init__.py
 │   │   ├── request.py
@@ -177,7 +194,7 @@ ritecare-bu{N}-{name}/
 │   ├── database/
 │   │   ├── __init__.py
 │   │   ├── client.py                # MongoDB Atlas Motor client (singleton)
-│   │   └── collections.py           # Collection name constants
+│   │   └── collections.py           # Collection name constants (CRUD + vector)
 │   ├── exceptions/
 │   │   ├── __init__.py
 │   │   └── handlers.py              # FastAPI exception handlers
@@ -193,7 +210,8 @@ ritecare-bu{N}-{name}/
 │   ├── conftest.py
 │   ├── unit/
 │   │   ├── test_service.py
-│   │   └── test_dao.py
+│   │   ├── test_dao.py
+│   │   └── test_ingestion.py
 │   └── integration/
 │       └── test_router.py
 │
@@ -210,8 +228,75 @@ ritecare-bu{N}-{name}/
 |-------|---------------|-----------------|
 | `api` | HTTP routing, request validation, response serialisation | `service`, `common` |
 | `service` | Business rules, orchestration, error handling | `dao`, `common` |
-| `dao` | All DB queries — no business logic | `common` |
+| `dao` | All DB queries (CRUD + vector search) — no business logic | `common` |
+| `ingestion` | Document loading, chunking, embedding, indexing — runs offline | `dao`, `common` |
 | `common` | Config, models, schemas, DB client, logging, limiting | nothing above |
+
+---
+
+## RAG Design
+
+### How RAG works in this project
+
+```
+── Ingestion (offline) ──────────────────────────────────────────────
+Document (PDF / text)
+    → pdf_loader / text_loader        (extract raw text)
+    → chunker                         (split into ~500 token chunks)
+    → embedder                        (OpenAI text-embedding-3-small)
+    → vector_dao.insert_chunk()       (store in MongoDB Atlas Vector index)
+
+── Retrieval (at query time via MCP) ────────────────────────────────
+User query
+    → embed query (text-embedding-3-small)
+    → vector_dao.search(query_vector, top_k=5)   (cosine similarity)
+    → top-K chunks returned as context
+    → injected into PydanticAI agent alongside CRUD tool results
+    → LLM reasons over combined context → response
+```
+
+### RAG per Business Unit
+
+| BU | Vector Collection | Document Types | Example Query |
+|----|------------------|----------------|---------------|
+| BU1 | `bu1_document_chunks` | KYC forms, onboarding checklists | *"What documents did customer C123 upload?"* |
+| BU2 | `bu2_document_chunks` | Service manuals, contract PDFs, field guides | *"How do I service the X200 pump unit?"* |
+| BU3 | `bu3_document_chunks` | Invoice PDFs, billing statements, plan terms | *"Why was customer C456 charged $500 in March?"* |
+| BU4 | `bu4_document_chunks` | KB articles, resolved tickets, troubleshooting guides | *"Has this fault been seen before? How was it fixed?"* |
+
+### MongoDB Atlas Vector Index (per BU collection)
+
+```json
+{
+  "fields": [
+    {
+      "type": "vector",
+      "path": "embedding",
+      "numDimensions": 1536,
+      "similarity": "cosine"
+    },
+    {
+      "type": "filter",
+      "path": "customer_id"
+    },
+    {
+      "type": "filter",
+      "path": "bu"
+    }
+  ]
+}
+```
+
+### RAG MCP Tools (in `mcp/tools/rag_tools.py`)
+
+| Tool | BU | Description |
+|------|----|-------------|
+| `search_onboarding_docs` | BU1 | Semantic search over KYC / onboarding documents |
+| `search_service_manuals` | BU2 | Semantic search over equipment manuals and field guides |
+| `search_contracts` | BU2 | Semantic search over contract PDFs |
+| `search_billing_statements` | BU3 | Semantic search over invoice and billing documents |
+| `search_knowledge_base` | BU4 | Semantic search over KB articles |
+| `search_resolved_tickets` | BU4 | Semantic search over past resolved support tickets |
 
 ---
 
@@ -219,7 +304,7 @@ ritecare-bu{N}-{name}/
 
 ---
 
-### Phase 1 — Project Foundation
+### Phase 1 — Project Foundation (Main Repo)
 **Goal:** Working skeleton with config, logging, and shared utilities.
 
 - [ ] `pyproject.toml` — dependencies, project metadata
@@ -229,22 +314,18 @@ ritecare-bu{N}-{name}/
 - [ ] `shared/exceptions.py` — base exception classes
 - [ ] `shared/utils/http_client.py` — shared async httpx client
 - [ ] `db/client.py` — MongoDB Atlas Motor singleton
-- [ ] `db/collections.py` — collection name constants
+- [ ] `db/collections.py` — collection name constants (CRUD + vector collections)
 
 **Exit criteria:** `python -c "from shared.config import settings; print(settings)"` runs without error.
 
 ---
 
-### Phase 2 — MongoDB Document Models
-**Goal:** All Pydantic v2 document models with MongoDB `_id` handling.
+### Phase 2 — MongoDB Document Models (Main Repo)
+**Goal:** Pydantic v2 conversation model for the agent with MongoDB `_id` handling.
 
-- [ ] `db/models/customer.py` — Customer (name, contact, KYC status, onboarding stage)
-- [ ] `db/models/contract.py` — Sales contract (customer_id, type, start/end dates, status)
-- [ ] `db/models/invoice.py` — Invoice (customer_id, amount, due_date, paid status)
-- [ ] `db/models/ticket.py` — Support ticket (customer_id, category, priority, SLA, status)
-- [ ] `db/models/conversation.py` — Agent conversation (session_id, messages[], channel, user)
+- [ ] `db/models/conversation.py` — Agent conversation (session_id, messages[], channel, user_id, created_at)
 
-**Exit criteria:** All models instantiate and serialize to/from dict correctly.
+**Exit criteria:** Model instantiates and serialises to/from dict correctly.
 
 ---
 
@@ -252,14 +333,15 @@ ritecare-bu{N}-{name}/
 **Goal:** Four independently runnable FastAPI services, each in its own repo, using the layered architecture (api → service → dao → common).
 
 Each microservice is built in this order per repo:
-1. `common/` — config, models, schemas, database client, logger, rate limiter, exceptions
-2. `dao/` — MongoDB queries
+1. `common/` — config, models (domain + document_chunk), schemas, database client, logger, rate limiter, exceptions
+2. `dao/` — MongoDB CRUD queries + vector search queries
 3. `service/` — business logic
 4. `api/` — routes, dependencies, app entry
 
 #### BU1 — Customer Onboarding (`ritecare-bu1-onboarding`, port 8001)
-- [ ] `common/` — CustomerModel, CustomerCreateSchema, CustomerResponseSchema, DB client
+- [ ] `common/` — CustomerModel, DocumentChunkModel, CustomerCreateSchema, CustomerResponseSchema, DB client
 - [ ] `dao/customer_dao.py` — insert, find_by_id, update_kyc
+- [ ] `dao/vector_dao.py` — insert_chunk, search (cosine similarity)
 - [ ] `service/customer_service.py` — register, get profile, update KYC, get onboarding status
 - [ ] `api/router.py` — endpoints:
   - `POST /customers` — register new customer
@@ -268,8 +350,8 @@ Each microservice is built in this order per repo:
   - `GET /customers/{id}/onboarding-status` — get onboarding progress
 
 #### BU2 — Sales & Maintenance (`ritecare-bu2-sales-maintenance`, port 8002)
-- [ ] `common/` — ContractModel, VisitModel, request/response schemas, DB client
-- [ ] `dao/contract_dao.py` + `dao/visit_dao.py`
+- [ ] `common/` — ContractModel, VisitModel, DocumentChunkModel, request/response schemas, DB client
+- [ ] `dao/contract_dao.py` + `dao/visit_dao.py` + `dao/vector_dao.py`
 - [ ] `service/contract_service.py` + `service/visit_service.py`
 - [ ] `api/router.py` — endpoints:
   - `POST /contracts` — create service contract
@@ -279,8 +361,8 @@ Each microservice is built in this order per repo:
   - `PATCH /visits/{id}` — update visit status
 
 #### BU3 — Billing & Subscription (`ritecare-bu3-billing-subscription`, port 8003)
-- [ ] `common/` — InvoiceModel, SubscriptionModel, request/response schemas, DB client
-- [ ] `dao/invoice_dao.py` + `dao/subscription_dao.py`
+- [ ] `common/` — InvoiceModel, SubscriptionModel, DocumentChunkModel, request/response schemas, DB client
+- [ ] `dao/invoice_dao.py` + `dao/subscription_dao.py` + `dao/vector_dao.py`
 - [ ] `service/invoice_service.py` + `service/subscription_service.py`
 - [ ] `api/router.py` — endpoints:
   - `POST /invoices` — create invoice
@@ -290,8 +372,8 @@ Each microservice is built in this order per repo:
   - `PATCH /subscriptions/{customer_id}` — update plan
 
 #### BU4 — Support & Fulfillment (`ritecare-bu4-support-fulfillment`, port 8004)
-- [ ] `common/` — TicketModel, request/response schemas, DB client
-- [ ] `dao/ticket_dao.py`
+- [ ] `common/` — TicketModel, DocumentChunkModel, request/response schemas, DB client
+- [ ] `dao/ticket_dao.py` + `dao/vector_dao.py`
 - [ ] `service/ticket_service.py`
 - [ ] `api/router.py` — endpoints:
   - `POST /tickets` — raise support ticket
@@ -304,40 +386,100 @@ Each microservice is built in this order per repo:
 
 ---
 
-### Phase 4 — MCP Tools
-**Goal:** MCP `@tool` functions that call BU1–BU4 REST APIs.
+### Phase 3.5 — Document Ingestion & Vector Indexing (per BU repo)
+**Goal:** Offline pipeline that loads, chunks, embeds, and stores documents into MongoDB Atlas Vector Search per BU.
 
-- [ ] `mcp/server.py` — MCP server setup
-- [ ] `mcp/tools/bu1_tools.py` — tools: `get_customer`, `register_customer`, `update_kyc`, `get_onboarding_status`
-- [ ] `mcp/tools/bu2_tools.py` — tools: `get_contract`, `create_contract`, `schedule_visit`, `update_visit`
-- [ ] `mcp/tools/bu3_tools.py` — tools: `get_invoices`, `create_invoice`, `pay_invoice`, `get_subscription`, `update_subscription`
-- [ ] `mcp/tools/bu4_tools.py` — tools: `raise_ticket`, `get_ticket`, `update_ticket_status`, `escalate_ticket`, `list_tickets`
+For each BU repo:
+- [ ] `common/models/document_chunk.py` — `DocumentChunk` model (text, embedding: list[float], metadata, bu, customer_id, source)
+- [ ] `ingestion/loaders/pdf_loader.py` — extract text from PDFs (pypdf)
+- [ ] `ingestion/loaders/text_loader.py` — load plain text / markdown
+- [ ] `ingestion/chunker.py` — split text into overlapping chunks (~500 tokens, 50 overlap)
+- [ ] `ingestion/embedder.py` — call `text-embedding-3-small`, return `list[float]` (1536 dims)
+- [ ] `ingestion/pipeline.py` — orchestrate load → chunk → embed → store via `vector_dao`
+- [ ] MongoDB Atlas Vector Search index created on each `bu{N}_document_chunks` collection
+- [ ] `dao/vector_dao.py` — `insert_chunk()`, `search(query_vector, top_k, filters)`
 
-**Exit criteria:** Each tool callable directly, returns correct data from the microservices.
+**BU-specific document types ingested:**
+
+| BU | Documents |
+|----|-----------|
+| BU1 | KYC forms, onboarding checklists |
+| BU2 | Equipment manuals, service procedure guides, contract PDFs |
+| BU3 | Invoice PDFs, billing statements, subscription plan terms |
+| BU4 | KB articles, resolved ticket history, troubleshooting guides |
+
+**Exit criteria:** Run `python -m ingestion.pipeline --file sample.pdf --bu bu2` → document chunked, embedded, and stored. Vector search returns relevant chunks for a test query.
 
 ---
 
-### Phase 5 — LangGraph Agent
-**Goal:** Fully working AI agent that receives a user query, selects the right tools, calls microservices, and returns an intelligent response.
+### Phase 4 — MCP Tools (Main Repo)
+**Goal:** MCP `@tool` functions for both CRUD operations (BU1–BU4 REST APIs) and RAG (Atlas Vector Search), all registered on the MCP server.
 
-- [ ] `agent/state.py` — `AgentState` TypedDict (messages, intent, tool_results, session_id)
-- [ ] `agent/prompts/system_prompt.py` — RiteCare-aware system prompt
-- [ ] `agent/nodes/intent_classifier.py` — LLM node: classify query to BU1/BU2/BU3/BU4
-- [ ] `agent/nodes/tool_executor.py` — execute MCP tool calls
-- [ ] `agent/nodes/responder.py` — LLM node: compose final natural language response
-- [ ] `agent/graph.py` — wire nodes + conditional edges into LangGraph `StateGraph`
-- [ ] Persist conversation to MongoDB (`db/models/conversation.py`)
+#### CRUD Tools
+- [ ] `mcp/server.py` — MCP server setup (FastMCP)
+- [ ] `mcp/tools/bu1_tools.py` — `get_customer`, `register_customer`, `update_kyc`, `get_onboarding_status`
+- [ ] `mcp/tools/bu2_tools.py` — `get_contract`, `create_contract`, `schedule_visit`, `update_visit`
+- [ ] `mcp/tools/bu3_tools.py` — `get_invoices`, `create_invoice`, `pay_invoice`, `get_subscription`, `update_subscription`
+- [ ] `mcp/tools/bu4_tools.py` — `raise_ticket`, `get_ticket`, `update_ticket_status`, `escalate_ticket`, `list_tickets`
 
-**Exit criteria:** Agent receives a plain English query (e.g. "What is the onboarding status for customer C123?"), calls the correct tool, and returns a human-readable answer.
+#### RAG Tools
+- [ ] `mcp/tools/rag_tools.py`:
+  - `search_onboarding_docs(query, customer_id)` → BU1 vector search
+  - `search_service_manuals(query)` → BU2 vector search
+  - `search_contracts(query, customer_id)` → BU2 vector search
+  - `search_billing_statements(query, customer_id)` → BU3 vector search
+  - `search_knowledge_base(query)` → BU4 vector search
+  - `search_resolved_tickets(query)` → BU4 vector search
+
+**Exit criteria:** All CRUD and RAG tools callable directly; RAG tools return relevant chunks for test queries.
+
+---
+
+### Phase 5 — PydanticAI Agent (Main Repo)
+**Goal:** Fully working AI agent that receives a user query, selects the right CRUD and/or RAG MCP tools, combines results, persists the conversation, and returns an intelligent response.
+
+- [ ] `agent/prompts/system_prompt.py` — RiteCare-aware system prompt (BU context, tool guidance, RAG instructions)
+- [ ] `agent/dependencies.py` — `AgentDeps` dataclass (httpx client, MongoDB session, user context)
+- [ ] `agent/agent.py` — PydanticAI `Agent` definition:
+  - Model: `openai:gpt-4o-mini`
+  - MCP servers: attach `mcp/server.py` (all CRUD + RAG tools)
+  - Result type: `str` (natural language response)
+  - System prompt: loaded from `prompts/system_prompt.py`
+- [ ] Persist conversation turns to MongoDB (`db/models/conversation.py`)
+
+**How PydanticAI works here:**
+```python
+agent = Agent(
+    model="openai:gpt-4o-mini",
+    mcp_servers=[mcp_server],
+    deps_type=AgentDeps,
+    system_prompt=SYSTEM_PROMPT,
+)
+
+async with agent.run_mcp_servers():
+    result = await agent.run(user_query, deps=deps)
+```
+The agent automatically selects CRUD tools, RAG tools, or both based on the query — no manual routing needed.
+
+**Example combined flow:**
+```
+Query: "How do I fix the pressure fault on customer C123's pump unit?"
+    → search_service_manuals("pressure fault pump")    [RAG → BU2 manual chunks]
+    → get_ticket(customer_id="C123", type="pressure")  [CRUD → BU4 open tickets]
+    → search_resolved_tickets("pressure fault pump")   [RAG → BU4 past solutions]
+    → LLM synthesises all results → actionable response
+```
+
+**Exit criteria:** Agent handles queries requiring CRUD only, RAG only, and combined CRUD + RAG. Conversation persisted to MongoDB.
 
 ---
 
 ### Phase 6 — Slack Gateway (Deferred)
 **Goal:** Connect everything to Slack.
 
-- [ ] `apps/slack_gateway/main.py` — Slack Bolt app
-- [ ] `apps/slack_gateway/handlers.py` — message event handler → LangGraph agent
-- [ ] `apps/slack_gateway/channel_router.py` — route by channel to correct BU context
+- [ ] `slack_gateway/main.py` — Slack Bolt app
+- [ ] `slack_gateway/handlers.py` — message event handler → PydanticAI agent
+- [ ] `slack_gateway/channel_router.py` — route by channel to inject BU context into system prompt
 - [ ] Docker-compose update to include gateway service
 - [ ] End-to-end test: Slack message → agent → response in Slack thread
 
@@ -350,6 +492,8 @@ Each microservice is built in this order per repo:
 ```env
 # OpenAI
 OPENAI_API_KEY=
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_CHAT_MODEL=gpt-4o-mini
 
 # MongoDB Atlas
 MONGODB_URI=
@@ -360,6 +504,11 @@ BU1_BASE_URL=http://localhost:8001
 BU2_BASE_URL=http://localhost:8002
 BU3_BASE_URL=http://localhost:8003
 BU4_BASE_URL=http://localhost:8004
+
+# RAG
+RAG_CHUNK_SIZE=500
+RAG_CHUNK_OVERLAP=50
+RAG_TOP_K=5
 
 # Slack (Phase 6)
 SLACK_BOT_TOKEN=
@@ -375,23 +524,19 @@ ENV=development
 
 ## Key Dependencies
 
+### Main Repo (`Field-Service-Document-Intelligence`)
+
 ```toml
 [project]
 dependencies = [
-    # Web framework
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-
-    # AI
-    "openai>=1.50",
-    "langgraph>=0.2",
-    "langchain-openai>=0.2",
+    # AI Orchestration
+    "pydantic-ai[openai]>=0.0.14",   # PydanticAI with OpenAI support
 
     # MCP
-    "mcp>=1.0",
+    "mcp>=1.0",                       # MCP protocol + FastMCP server
 
     # Database
-    "motor>=3.5",           # Async MongoDB driver
+    "motor>=3.5",                     # Async MongoDB driver
     "pymongo>=4.8",
 
     # Validation & config
@@ -419,15 +564,56 @@ dev = [
 ]
 ```
 
+### BU Microservice Repos (each identical)
+
+```toml
+[project]
+dependencies = [
+    # Web framework
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+
+    # Database
+    "motor>=3.5",
+    "pymongo>=4.8",
+
+    # Validation & config
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+
+    # Rate limiting
+    "slowapi>=0.1.9",
+
+    # RAG — document ingestion
+    "openai>=1.50",                   # Embedding API
+    "pypdf>=4.0",                     # PDF text extraction
+    "tiktoken>=0.7",                  # Token counting for chunking
+
+    # Utilities
+    "python-dotenv>=1.0",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",                    # Test client for FastAPI
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+```
+
 ---
 
 ## Current Status
 
 | Phase | Status |
 |-------|--------|
-| Phase 1 — Foundation | Not started |
-| Phase 2 — MongoDB Models | Not started |
-| Phase 3 — RiteCare Microservices | Not started |
-| Phase 4 — MCP Tools | Not started |
-| Phase 5 — LangGraph Agent | Not started |
+| Phase 1 — Foundation (Main Repo) | Not started |
+| Phase 2 — MongoDB Models (Main Repo) | Not started |
+| Phase 3 — RiteCare Microservices (BU1–BU4) | Not started |
+| Phase 3.5 — Document Ingestion & Vector Indexing | Not started |
+| Phase 4 — MCP Tools (CRUD + RAG) | Not started |
+| Phase 5 — PydanticAI Agent | Not started |
 | Phase 6 — Slack Gateway | Deferred |
