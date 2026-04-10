@@ -65,24 +65,56 @@ Document Upload (offline / async)
 
 ## Repository Structure
 
-Each BU microservice lives in its **own repository**. The main repo is the AI orchestration layer.
+This is a **monorepo**. All BU microservices and the AI orchestration layer live in the same repository under a `services/` directory.
 
-### Repositories
+### Service Ports
 
-| Repository | Port | Description |
-|------------|------|-------------|
-| `Field-Service-Document-Intelligence` | — | Main repo: agent, MCP, Slack gateway |
-| `ritecare-bu1-onboarding` | 8001 | Customer Onboarding microservice |
-| `ritecare-bu2-sales-maintenance` | 8002 | Sales & Maintenance microservice |
-| `ritecare-bu3-billing-subscription` | 8003 | Billing & Subscription microservice |
-| `ritecare-bu4-support-fulfillment` | 8004 | Support & Fulfillment microservice |
+| Service | Path | Port |
+|---------|------|------|
+| BU1 — Customer Onboarding | `services/bu1_onboarding/` | 8001 |
+| BU2 — Sales & Maintenance | `services/bu2_sales_maintenance/` | 8002 |
+| BU3 — Billing & Subscription | `services/bu3_billing_subscription/` | 8003 |
+| BU4 — Support & Fulfillment | `services/bu4_support_fulfillment/` | 8004 |
 
 ---
 
-### Main Repo — `Field-Service-Document-Intelligence`
+### Monorepo — `Field-Service-Document-Intelligence`
 
 ```
 Field-Service-Document-Intelligence/
+│
+├── services/                        # All BU microservices
+│   ├── bu1_onboarding/              # BU1 — port 8001
+│   │   ├── api/
+│   │   ├── service/
+│   │   ├── dao/
+│   │   ├── common/
+│   │   ├── .env.example
+│   │   └── pyproject.toml
+│   │
+│   ├── bu2_sales_maintenance/       # BU2 — port 8002
+│   │   ├── api/
+│   │   ├── service/
+│   │   ├── dao/
+│   │   ├── common/
+│   │   ├── .env.example
+│   │   └── pyproject.toml
+│   │
+│   ├── bu3_billing_subscription/    # BU3 — port 8003
+│   │   ├── api/
+│   │   ├── service/
+│   │   ├── dao/
+│   │   ├── common/
+│   │   ├── .env.example
+│   │   └── pyproject.toml
+│   │
+│   └── bu4_support_fulfillment/     # BU4 — port 8004
+│       ├── api/
+│       ├── service/
+│       ├── dao/
+│       ├── common/
+│       ├── .env.example
+│       └── pyproject.toml
 │
 ├── agent/
 │   ├── __init__.py
@@ -111,7 +143,7 @@ Field-Service-Document-Intelligence/
 │       ├── __init__.py
 │       └── conversation.py          # Agent conversation history model
 │
-├── slack_gateway/                   # Phase 6 — Slack event receiver
+├── slack_gateway/                   # Phase 5 — Slack event receiver
 │   ├── __init__.py
 │   ├── main.py
 │   ├── handlers.py
@@ -134,15 +166,15 @@ Field-Service-Document-Intelligence/
 │   ├── integration/
 │   │   └── test_agent.py
 │   └── e2e/
-│       └── test_slack_flow.py       # Phase 6
+│       └── test_slack_flow.py       # Phase 5
 │
 ├── docker/
 │   └── Dockerfile.agent
 │
 ├── .env.example
 ├── .gitignore
-├── docker-compose.yml               # Orchestrates all 5 services locally
-├── pyproject.toml
+├── docker-compose.yml               # Runs all 5 services locally
+├── pyproject.toml                   # Root — agent/mcp/db/shared deps
 └── README_Development_Plan.md
 ```
 
