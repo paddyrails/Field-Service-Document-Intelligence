@@ -56,50 +56,26 @@ Slack Message
 
 ---
 
-## Folder Structure
+## Repository Structure
+
+Each BU microservice lives in its **own repository**. The main repo is the AI orchestration layer.
+
+### Repositories
+
+| Repository | Port | Description |
+|------------|------|-------------|
+| `Field-Service-Document-Intelligence` | — | Main repo: agent, MCP, Slack gateway |
+| `ritecare-bu1-onboarding` | 8001 | Customer Onboarding microservice |
+| `ritecare-bu2-sales-maintenance` | 8002 | Sales & Maintenance microservice |
+| `ritecare-bu3-billing-subscription` | 8003 | Billing & Subscription microservice |
+| `ritecare-bu4-support-fulfillment` | 8004 | Support & Fulfillment microservice |
+
+---
+
+### Main Repo — `Field-Service-Document-Intelligence`
 
 ```
-field-service-document-intelligence/
-│
-├── apps/
-│   ├── ritecare/
-│   │   ├── bu1_onboarding/          # BU1 FastAPI microservice
-│   │   │   ├── __init__.py
-│   │   │   ├── main.py              # FastAPI app entry
-│   │   │   ├── router.py            # API routes
-│   │   │   ├── service.py           # Business logic
-│   │   │   ├── models.py            # Pydantic request/response models
-│   │   │   └── repository.py        # MongoDB queries
-│   │   │
-│   │   ├── bu2_sales_maintenance/   # BU2 FastAPI microservice
-│   │   │   ├── __init__.py
-│   │   │   ├── main.py
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── models.py
-│   │   │   └── repository.py
-│   │   │
-│   │   ├── bu3_billing_subscription/ # BU3 FastAPI microservice
-│   │   │   ├── __init__.py
-│   │   │   ├── main.py
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── models.py
-│   │   │   └── repository.py
-│   │   │
-│   │   └── bu4_support_fulfillment/ # BU4 FastAPI microservice
-│   │       ├── __init__.py
-│   │       ├── main.py
-│   │       ├── router.py
-│   │       ├── service.py
-│   │       ├── models.py
-│   │       └── repository.py
-│   │
-│   └── slack_gateway/               # Phase 6 — Slack event receiver
-│       ├── __init__.py
-│       ├── main.py
-│       ├── handlers.py
-│       └── channel_router.py
+Field-Service-Document-Intelligence/
 │
 ├── agent/
 │   ├── __init__.py
@@ -119,10 +95,10 @@ field-service-document-intelligence/
 │   ├── server.py                    # MCP server entry point
 │   └── tools/
 │       ├── __init__.py
-│       ├── bu1_tools.py             # @tool wrappers for BU1 API
-│       ├── bu2_tools.py             # @tool wrappers for BU2 API
-│       ├── bu3_tools.py             # @tool wrappers for BU3 API
-│       └── bu4_tools.py             # @tool wrappers for BU4 API
+│       ├── bu1_tools.py             # @tool wrappers → BU1 API
+│       ├── bu2_tools.py             # @tool wrappers → BU2 API
+│       ├── bu3_tools.py             # @tool wrappers → BU3 API
+│       └── bu4_tools.py             # @tool wrappers → BU4 API
 │
 ├── db/
 │   ├── __init__.py
@@ -130,11 +106,13 @@ field-service-document-intelligence/
 │   ├── collections.py               # Collection name constants
 │   └── models/
 │       ├── __init__.py
-│       ├── customer.py              # Customer document model
-│       ├── ticket.py                # Support ticket model
-│       ├── contract.py              # Sales contract model
-│       ├── invoice.py               # Billing invoice model
 │       └── conversation.py          # Agent conversation history model
+│
+├── slack_gateway/                   # Phase 6 — Slack event receiver
+│   ├── __init__.py
+│   ├── main.py
+│   ├── handlers.py
+│   └── channel_router.py
 │
 ├── shared/
 │   ├── __init__.py
@@ -148,29 +126,92 @@ field-service-document-intelligence/
 ├── tests/
 │   ├── conftest.py
 │   ├── unit/
-│   │   ├── test_bu1.py
-│   │   ├── test_bu2.py
-│   │   ├── test_bu3.py
-│   │   └── test_bu4.py
-│   ├── integration/
-│   │   ├── test_agent.py
 │   │   └── test_mcp_tools.py
+│   ├── integration/
+│   │   └── test_agent.py
 │   └── e2e/
 │       └── test_slack_flow.py       # Phase 6
 │
 ├── docker/
-│   ├── Dockerfile.bu1
-│   ├── Dockerfile.bu2
-│   ├── Dockerfile.bu3
-│   ├── Dockerfile.bu4
 │   └── Dockerfile.agent
 │
 ├── .env.example
 ├── .gitignore
-├── docker-compose.yml
+├── docker-compose.yml               # Orchestrates all 5 services locally
 ├── pyproject.toml
 └── README_Development_Plan.md
 ```
+
+---
+
+### BU Microservice Repos — Layered Architecture (repeated × 4)
+
+Each BU repo follows a **strict 4-layer architecture**: `api → service → dao → common`.
+
+```
+ritecare-bu{N}-{name}/
+│
+├── api/                             # Layer 1 — HTTP interface
+│   ├── __init__.py
+│   ├── main.py                      # FastAPI app entry point + lifespan
+│   ├── router.py                    # Route definitions (FastAPI APIRouter)
+│   └── dependencies.py              # FastAPI dependency injection (service, limiter)
+│
+├── service/                         # Layer 2 — Business logic
+│   ├── __init__.py
+│   └── {domain}_service.py          # Orchestrates dao calls, applies rules
+│
+├── dao/                             # Layer 3 — Data Access Objects
+│   ├── __init__.py
+│   └── {domain}_dao.py              # All MongoDB queries via Motor
+│
+├── common/                          # Layer 4 — Shared within this microservice
+│   ├── __init__.py
+│   ├── models/                      # MongoDB document models (Motor/Pydantic)
+│   │   ├── __init__.py
+│   │   └── {domain}.py
+│   ├── schemas/                     # Pydantic request/response schemas (API DTOs)
+│   │   ├── __init__.py
+│   │   ├── request.py
+│   │   └── response.py
+│   ├── database/
+│   │   ├── __init__.py
+│   │   ├── client.py                # MongoDB Atlas Motor client (singleton)
+│   │   └── collections.py           # Collection name constants
+│   ├── exceptions/
+│   │   ├── __init__.py
+│   │   └── handlers.py              # FastAPI exception handlers
+│   ├── limiter/
+│   │   ├── __init__.py
+│   │   └── rate_limiter.py          # Rate limiting (slowapi)
+│   ├── logging/
+│   │   ├── __init__.py
+│   │   └── logger.py                # Structured JSON logging (structlog)
+│   └── config.py                    # Pydantic Settings (.env loader)
+│
+├── tests/
+│   ├── conftest.py
+│   ├── unit/
+│   │   ├── test_service.py
+│   │   └── test_dao.py
+│   └── integration/
+│       └── test_router.py
+│
+├── .env.example
+├── .gitignore
+├── Dockerfile
+├── pyproject.toml
+└── README.md
+```
+
+#### Layer Responsibilities
+
+| Layer | Responsibility | May import from |
+|-------|---------------|-----------------|
+| `api` | HTTP routing, request validation, response serialisation | `service`, `common` |
+| `service` | Business rules, orchestration, error handling | `dao`, `common` |
+| `dao` | All DB queries — no business logic | `common` |
+| `common` | Config, models, schemas, DB client, logging, limiting | nothing above |
 
 ---
 
@@ -208,36 +249,58 @@ field-service-document-intelligence/
 ---
 
 ### Phase 3 — RiteCare Microservices (BU1–BU4)
-**Goal:** Four independently runnable FastAPI services with full CRUD.
+**Goal:** Four independently runnable FastAPI services, each in its own repo, using the layered architecture (api → service → dao → common).
 
-#### BU1 — Customer Onboarding (port 8001)
-- [ ] `POST /customers` — register new customer
-- [ ] `GET /customers/{id}` — get customer profile
-- [ ] `PATCH /customers/{id}/kyc` — update KYC status
-- [ ] `GET /customers/{id}/onboarding-status` — get onboarding progress
+Each microservice is built in this order per repo:
+1. `common/` — config, models, schemas, database client, logger, rate limiter, exceptions
+2. `dao/` — MongoDB queries
+3. `service/` — business logic
+4. `api/` — routes, dependencies, app entry
 
-#### BU2 — Sales & Maintenance (port 8002)
-- [ ] `POST /contracts` — create service contract
-- [ ] `GET /contracts/{id}` — get contract details
-- [ ] `POST /visits` — schedule field visit
-- [ ] `GET /visits` — list upcoming visits
-- [ ] `PATCH /visits/{id}` — update visit status
+#### BU1 — Customer Onboarding (`ritecare-bu1-onboarding`, port 8001)
+- [ ] `common/` — CustomerModel, CustomerCreateSchema, CustomerResponseSchema, DB client
+- [ ] `dao/customer_dao.py` — insert, find_by_id, update_kyc
+- [ ] `service/customer_service.py` — register, get profile, update KYC, get onboarding status
+- [ ] `api/router.py` — endpoints:
+  - `POST /customers` — register new customer
+  - `GET /customers/{id}` — get customer profile
+  - `PATCH /customers/{id}/kyc` — update KYC status
+  - `GET /customers/{id}/onboarding-status` — get onboarding progress
 
-#### BU3 — Billing & Subscription (port 8003)
-- [ ] `GET /invoices/{customer_id}` — list customer invoices
-- [ ] `POST /invoices` — create invoice
-- [ ] `PATCH /invoices/{id}/pay` — mark invoice as paid
-- [ ] `GET /subscriptions/{customer_id}` — get subscription plan
-- [ ] `PATCH /subscriptions/{customer_id}` — update plan
+#### BU2 — Sales & Maintenance (`ritecare-bu2-sales-maintenance`, port 8002)
+- [ ] `common/` — ContractModel, VisitModel, request/response schemas, DB client
+- [ ] `dao/contract_dao.py` + `dao/visit_dao.py`
+- [ ] `service/contract_service.py` + `service/visit_service.py`
+- [ ] `api/router.py` — endpoints:
+  - `POST /contracts` — create service contract
+  - `GET /contracts/{id}` — get contract details
+  - `POST /visits` — schedule field visit
+  - `GET /visits` — list upcoming visits
+  - `PATCH /visits/{id}` — update visit status
 
-#### BU4 — Support & Fulfillment (port 8004)
-- [ ] `POST /tickets` — raise support ticket
-- [ ] `GET /tickets/{id}` — get ticket details
-- [ ] `PATCH /tickets/{id}/status` — update ticket status
-- [ ] `POST /tickets/{id}/escalate` — escalate ticket
-- [ ] `GET /tickets/{customer_id}` — list customer tickets
+#### BU3 — Billing & Subscription (`ritecare-bu3-billing-subscription`, port 8003)
+- [ ] `common/` — InvoiceModel, SubscriptionModel, request/response schemas, DB client
+- [ ] `dao/invoice_dao.py` + `dao/subscription_dao.py`
+- [ ] `service/invoice_service.py` + `service/subscription_service.py`
+- [ ] `api/router.py` — endpoints:
+  - `POST /invoices` — create invoice
+  - `GET /invoices/{customer_id}` — list customer invoices
+  - `PATCH /invoices/{id}/pay` — mark invoice as paid
+  - `GET /subscriptions/{customer_id}` — get subscription plan
+  - `PATCH /subscriptions/{customer_id}` — update plan
 
-**Exit criteria:** All endpoints return correct responses, verified with pytest + httpx.
+#### BU4 — Support & Fulfillment (`ritecare-bu4-support-fulfillment`, port 8004)
+- [ ] `common/` — TicketModel, request/response schemas, DB client
+- [ ] `dao/ticket_dao.py`
+- [ ] `service/ticket_service.py`
+- [ ] `api/router.py` — endpoints:
+  - `POST /tickets` — raise support ticket
+  - `GET /tickets/{id}` — get ticket details
+  - `GET /tickets/customer/{customer_id}` — list customer tickets
+  - `PATCH /tickets/{id}/status` — update ticket status
+  - `POST /tickets/{id}/escalate` — escalate ticket
+
+**Exit criteria:** All endpoints return correct responses per BU, verified with pytest + httpx in each repo.
 
 ---
 
