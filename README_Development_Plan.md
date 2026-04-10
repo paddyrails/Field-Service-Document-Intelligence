@@ -425,7 +425,7 @@ Query: "How do I fix the pressure fault on customer C123's pump unit?"
 
 ---
 
-### Phase 6 — Slack Gateway (Deferred)
+### Phase 5 — Slack Gateway (Deferred)
 **Goal:** Connect everything to Slack.
 
 - [ ] `slack_gateway/main.py` — Slack Bolt app
@@ -564,7 +564,5 @@ dev = [
 | Phase 1 — Foundation (Main Repo) | Not started |
 | Phase 2 — MongoDB Models (Main Repo) | Not started |
 | Phase 3 — RiteCare Microservices (BU1–BU4) | Not started |
-| Phase 3.5 — Document Ingestion & Vector Indexing | Not started |
-| Phase 4 — MCP Tools (CRUD + RAG) | Not started |
-| Phase 5 — PydanticAI Agent | Not started |
-| Phase 6 — Slack Gateway | Deferred |
+| Phase 4 — PydanticAI Agent | Not started |
+| Phase 5 — Slack Gateway | Deferred |
