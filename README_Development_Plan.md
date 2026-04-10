@@ -386,56 +386,7 @@ Each microservice is built in this order per repo:
 
 ---
 
-### Phase 3.5 — Document Ingestion & Vector Indexing (per BU repo)
-**Goal:** Offline pipeline that loads, chunks, embeds, and stores documents into MongoDB Atlas Vector Search per BU.
-
-For each BU repo:
-- [ ] `common/models/document_chunk.py` — `DocumentChunk` model (text, embedding: list[float], metadata, bu, customer_id, source)
-- [ ] `ingestion/loaders/pdf_loader.py` — extract text from PDFs (pypdf)
-- [ ] `ingestion/loaders/text_loader.py` — load plain text / markdown
-- [ ] `ingestion/chunker.py` — split text into overlapping chunks (~500 tokens, 50 overlap)
-- [ ] `ingestion/embedder.py` — call `text-embedding-3-small`, return `list[float]` (1536 dims)
-- [ ] `ingestion/pipeline.py` — orchestrate load → chunk → embed → store via `vector_dao`
-- [ ] MongoDB Atlas Vector Search index created on each `bu{N}_document_chunks` collection
-- [ ] `dao/vector_dao.py` — `insert_chunk()`, `search(query_vector, top_k, filters)`
-
-**BU-specific document types ingested:**
-
-| BU | Documents |
-|----|-----------|
-| BU1 | KYC forms, onboarding checklists |
-| BU2 | Equipment manuals, service procedure guides, contract PDFs |
-| BU3 | Invoice PDFs, billing statements, subscription plan terms |
-| BU4 | KB articles, resolved ticket history, troubleshooting guides |
-
-**Exit criteria:** Run `python -m ingestion.pipeline --file sample.pdf --bu bu2` → document chunked, embedded, and stored. Vector search returns relevant chunks for a test query.
-
----
-
-### Phase 4 — MCP Tools (Main Repo)
-**Goal:** MCP `@tool` functions for both CRUD operations (BU1–BU4 REST APIs) and RAG (Atlas Vector Search), all registered on the MCP server.
-
-#### CRUD Tools
-- [ ] `mcp/server.py` — MCP server setup (FastMCP)
-- [ ] `mcp/tools/bu1_tools.py` — `get_customer`, `register_customer`, `update_kyc`, `get_onboarding_status`
-- [ ] `mcp/tools/bu2_tools.py` — `get_contract`, `create_contract`, `schedule_visit`, `update_visit`
-- [ ] `mcp/tools/bu3_tools.py` — `get_invoices`, `create_invoice`, `pay_invoice`, `get_subscription`, `update_subscription`
-- [ ] `mcp/tools/bu4_tools.py` — `raise_ticket`, `get_ticket`, `update_ticket_status`, `escalate_ticket`, `list_tickets`
-
-#### RAG Tools
-- [ ] `mcp/tools/rag_tools.py`:
-  - `search_onboarding_docs(query, customer_id)` → BU1 vector search
-  - `search_service_manuals(query)` → BU2 vector search
-  - `search_contracts(query, customer_id)` → BU2 vector search
-  - `search_billing_statements(query, customer_id)` → BU3 vector search
-  - `search_knowledge_base(query)` → BU4 vector search
-  - `search_resolved_tickets(query)` → BU4 vector search
-
-**Exit criteria:** All CRUD and RAG tools callable directly; RAG tools return relevant chunks for test queries.
-
----
-
-### Phase 5 — PydanticAI Agent (Main Repo)
+### Phase 4 — PydanticAI Agent (Main Repo)
 **Goal:** Fully working AI agent that receives a user query, selects the right CRUD and/or RAG MCP tools, combines results, persists the conversation, and returns an intelligent response.
 
 - [ ] `agent/prompts/system_prompt.py` — RiteCare-aware system prompt (BU context, tool guidance, RAG instructions)
