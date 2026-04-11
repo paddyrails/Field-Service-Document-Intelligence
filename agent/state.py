@@ -10,3 +10,5 @@ class AgentState(TypedDict):
     session_id: str # Links this run to a MongoDB conversation record
     channel: str # Slack channel name (used to inject BU context)
     final_response: str # the composed answer, set by the responder node
+
+    

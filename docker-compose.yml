@@ -18,6 +18,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8001
+    volumes:
+      - ./docs/bu1:/docs/bu1:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s
@@ -44,6 +46,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8002
+    volumes:
+      - ./docs/bu2:/docs/bu2:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
       interval: 30s
@@ -70,6 +74,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8003
+    volumes:
+      - ./docs/bu3:/docs/bu3:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
       interval: 30s
@@ -96,6 +102,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8004
+    volumes:
+      - ./docs/bu4:/docs/bu4:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
       interval: 30s
