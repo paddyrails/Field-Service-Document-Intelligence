@@ -1,0 +1,105 @@
+services:
+
+  bu1_onboarding:
+    build:
+      context: ./services/bu1_onboarding
+      dockerfile: Dockerfile
+    container_name: ritecare-bu1
+    ports:
+      - "8001:8001"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+      APP_PORT: 8001
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  bu2_sales_maintenance:
+    build:
+      context: ./services/bu2_sales_maintenance
+      dockerfile: Dockerfile
+    container_name: ritecare-bu2
+    ports:
+      - "8002:8002"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+      APP_PORT: 8002
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  bu3_billing_subscription:
+    build:
+      context: ./services/bu3_billing_subscription
+      dockerfile: Dockerfile
+    container_name: ritecare-bu3
+    ports:
+      - "8003:8003"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+      APP_PORT: 8003
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  bu4_support_fulfillment:
+    build:
+      context: ./services/bu4_support_fulfillment
+      dockerfile: Dockerfile
+    container_name: ritecare-bu4
+    ports:
+      - "8004:8004"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+      APP_PORT: 8004
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
