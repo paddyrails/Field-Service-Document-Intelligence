@@ -21,11 +21,12 @@ class CustomerDAO:
             return None
         return Customer.from_mongo(doc)
     
-    async def find_by_email(self, email:str) -> Customer:
-        doc = await self.collection.find_one({"email" : email})
+    async def find_by_email(self, email: str) -> Customer | None:
+        doc = await self.collection.find_one({"email": email})
         if doc is None:
             return None
-        
+        return Customer.from_mongo(doc)
+
 
     async def update_kyc(
             self, customer_id: str, kyc_status: KYCStatus, kyc_notes: str

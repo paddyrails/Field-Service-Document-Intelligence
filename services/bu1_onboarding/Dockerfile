@@ -17,6 +17,7 @@ COPY api/       ./api/
 COPY service/   ./service/
 COPY dao/       ./dao/
 COPY common/    ./common/
+COPY ingestion/    ./ingestion/
 
 EXPOSE 8001
 

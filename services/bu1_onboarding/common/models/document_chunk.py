@@ -11,7 +11,7 @@ class DocumentChunk(BaseModel):
     source: str
     customer_id: str | None = None
     bu: str = "bu1"
-    createad_at: datetime = Field(default_factory=lambda:datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_mongo(self) -> dict:
         return self.model_dump(by_alias=True, exclude_none=True)

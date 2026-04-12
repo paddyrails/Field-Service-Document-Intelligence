@@ -12,4 +12,7 @@ class KYCUpdateRequest(BaseModel):
     kyc_status: KYCStatus
     kyc_notes: str = ""
 
+class IngestRequest(BaseModel):
+    folder_path: str
+    metadata: dict = {}
     

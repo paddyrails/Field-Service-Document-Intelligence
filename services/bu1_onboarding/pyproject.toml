@@ -16,7 +16,8 @@ dependencies = [
     "tiktoken>=0.7",
     "python-dotenv>=1.0",
     "structlog>=24.0",
-    "pydantic[email]"
+    "pydantic[email]",
+    "pypdf"
 ]
 
 [project.optional-dependencies]

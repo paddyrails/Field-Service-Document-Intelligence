@@ -6,7 +6,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from api.router import router
+from api.router import ingest_router, router
 from common.config import settings
 from common.database.client import close_client
 from common.exceptions.handlers import (
@@ -37,6 +37,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_exception_handler(CustomerNotFoundError, customer_not_found_handler)
 app.add_exception_handler(DuplicateCustomerError, duplicate_customer_handler)   
 app.include_router(router)
+app.include_router(ingest_router)
 
 @app.get("/health", tags=["health"])
 async def health() -> dict:
