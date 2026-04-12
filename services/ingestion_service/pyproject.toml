@@ -1,0 +1,35 @@
+[project]
+name = "ritecare-ingestion-service"
+version = "0.1.0"
+description = "Document ingestion service for RiteCare — triggers Airflow DAG runs"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27",
+    "pydantic-settings>=2.4",
+    "python-dotenv>=1.0",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["api", "service", "pipeline", "common"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

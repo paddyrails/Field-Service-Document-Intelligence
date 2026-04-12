@@ -1,5 +1,57 @@
 services:
 
+  slack_gateway:
+    build:
+      context: ./services/slack_gateway
+      dockerfile: Dockerfile
+    container_name: ritecare-slack-gateway
+    environment:
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_APP_TOKEN: ${SLACK_APP_TOKEN}
+      AGENT_BASE_URL: http://agent:8000
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      agent:
+        condition: service_healthy
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ./services/agent_service
+      dockerfile: Dockerfile
+    container_name: ritecare-agent
+    ports:
+      - "8000:8000"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      BU1_BASE_URL: http://bu1_onboarding:8001
+      BU2_BASE_URL: http://bu2_sales_maintenance:8002
+      BU3_BASE_URL: http://bu3_billing_subscription:8003
+      BU4_BASE_URL: http://bu4_support_fulfillment:8004
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+    depends_on:
+      bu1_onboarding:
+        condition: service_healthy
+      bu2_sales_maintenance:
+        condition: service_healthy
+      bu3_billing_subscription:
+        condition: service_healthy
+      bu4_support_fulfillment:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
   bu1_onboarding:
     build:
       context: ./services/bu1_onboarding
@@ -111,3 +163,64 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+
+  ingestion_service:
+    build:
+      context: ./services/ingestion_service
+      dockerfile: Dockerfile
+    container_name: ritecare-ingestion
+    ports:
+      - "8005:8005"
+    environment:
+      AIRFLOW_BASE_URL: http://airflow:8080
+      AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-admin}
+      AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      UPLOAD_DIR: /docs/uploads
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+    volumes:
+      - uploads:/docs/uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  airflow:
+    image: apache/airflow:2.9.0
+    container_name: ritecare-airflow
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+      AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_USERNAME:-admin}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
+      PYTHONPATH: /opt/airflow/ingestion_service
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
+      INGESTION_SERVICE_URL: http://ingestion_service:8005
+      _PIP_ADDITIONAL_REQUIREMENTS: "openai pymongo pymongo[srv] pypdf tiktoken"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./services/ingestion_service:/opt/airflow/ingestion_service
+      - uploads:/docs/uploads
+      - airflow_db:/opt/airflow
+    command: >
+      bash -c "airflow db migrate &&
+               airflow users create --username $${AIRFLOW_ADMIN_USERNAME:-admin}
+                 --password $${AIRFLOW_ADMIN_PASSWORD:-admin}
+                 --firstname Admin --lastname User
+                 --role Admin --email admin@ritecare.com &&
+               airflow webserver & airflow scheduler"
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  airflow_db:
