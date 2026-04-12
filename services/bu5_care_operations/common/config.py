@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     kafka_topic: str = "appointment.booked"
     kafka_group_id: str = "bu5-care-operations"
 
+    # Agent
+    agent_base_url: str = "http://agent:8000"
+
     # Slack
     slack_bot_token: str
     slack_members_channel: str = "rc-care-members"

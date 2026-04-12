@@ -1,7 +1,12 @@
+import logging
 from datetime import datetime
+
+import httpx
 
 from common.config import settings
 from common.exceptions.handlers import VisitNotFoundError
+
+logger = logging.getLogger(__name__)
 from common.models.visit import ServiceType, Visit, VisitStatus
 from common.schemas.request import RAGSearchRequest, VisitClaimRequest, VisitCreateRequest, VisitStatusUpdateRequest
 from common.schemas.response import ClaimVisitResponse, RAGSearchResponse, VisitResponse
@@ -85,7 +90,7 @@ class VisitService:
             )
 
     async def claim_visit(self, visit_id: str, request: VisitClaimRequest) -> ClaimVisitResponse:
-        """Assign a pending visit to a field officer and return care instructions."""
+        """Assign a pending visit to a field officer and return care instructions via Agent."""
         visit = await self.visit_dao.find_by_id(visit_id)
         if visit is None:
             raise VisitNotFoundError(visit_id)
@@ -93,17 +98,45 @@ class VisitService:
         await self.visit_dao.assign_visit(visit_id, request.slack_user_id)
         updated = await self.visit_dao.find_by_id(visit_id)
 
-        results = await self.vector_dao.search(
-            query=f"preparation checklist and requirements for {updated.service_type.value} home visit",  # type: ignore[union-attr]
-            top_k=settings.rag_top_k,
-            service_type=updated.service_type.value,  # type: ignore[union-attr]
+        service_type = updated.service_type.value  # type: ignore[union-attr]
+        query = (
+            f"What are the preparation checklist and requirements for a "
+            f"{service_type} home visit for patient {updated.patient_name}?"  # type: ignore[union-attr]
+            f" Include what supplies, equipment, and documentation to bring."
         )
-        care_instructions = [r["text"] for r in results]
+
+        care_instructions = await self._fetch_agent_instructions(
+            query=query,
+            session_id=f"visit-claim-{visit_id}",
+            user_id=request.slack_user_id,
+        )
 
         return ClaimVisitResponse(
             visit=self._to_response(updated),  # type: ignore[arg-type]
             care_instructions=care_instructions,
         )
+
+    async def _fetch_agent_instructions(
+        self, query: str, session_id: str, user_id: str
+    ) -> list[str]:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{settings.agent_base_url}/query",
+                    json={
+                        "query": query,
+                        "session_id": session_id,
+                        "channel": "care-operations",
+                        "user_id": user_id,
+                    },
+                    timeout=60.0,
+                )
+                response.raise_for_status()
+                agent_reply = response.json().get("response", "")
+                return [agent_reply] if agent_reply else []
+        except Exception as e:
+            logger.error(f"Agent API call failed for visit claim: {e}")
+            return []
 
     def _to_response(self, visit: Visit) -> VisitResponse:
         return VisitResponse(
