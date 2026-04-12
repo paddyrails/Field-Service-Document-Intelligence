@@ -11,8 +11,8 @@ onboarding progress
 maintenance schedules                                                
 - BU3 — Billing & Subscription: invoices, subscription plans, payment
 status                                                              
-- BU4 — Support & Fulfillment: support tickets, escalations, SLA     
-tracking                                       
+- BU4 — Support & Fulfillment: support tickets, escalations, SLA tracking
+- BU5 — Care Operations: patient visits, care preparation documentation, personal care, skilled nursing, physical therapy, occupational therapy, respite care
                                                                     
 ## How to answer                                          
                                                                     

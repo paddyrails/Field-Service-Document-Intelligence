@@ -28,6 +28,7 @@ BU_COLLECTIONS = {
     "BU2": "bu2_document_chunks",
     "BU3": "bu3_document_chunks",
     "BU4": "bu4_document_chunks",
+    "BU5": "bu5_document_chunks",
 }
 
 INGESTION_SERVICE_URL = os.environ.get("INGESTION_SERVICE_URL", "http://ingestion_service:8005")
@@ -63,7 +64,7 @@ def embed(**context) -> list[dict]:
     """Embed chunks using OpenAI."""
     conf = context["dag_run"].conf
     chunks: list[str] = context["ti"].xcom_pull(task_ids="chunk", key="chunks")
-    embedded = asyncio.run(embed_chunks(chunks, bu=conf["bu"], customer_id=conf.get("customer_id", "")))
+    embedded = asyncio.run(embed_chunks(chunks, bu=conf["bu"], customer_id=conf.get("customer_id", ""), service_type=conf.get("service_type", "")))
     context["ti"].xcom_push(key="embedded", value=embedded)
     return embedded
 

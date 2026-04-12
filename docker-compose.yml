@@ -1,4 +1,55 @@
 services:
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: ritecare-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  appointment_service:
+    build:
+      context: ./services/appointment_service
+      dockerfile: Dockerfile
+    container_name: ritecare-appointment
+    ports:
+      - "8007:8007"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: appointment.booked
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+      APP_PORT: 8007
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
 
   slack_gateway:
     build:
@@ -9,9 +60,12 @@ services:
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
       SLACK_APP_TOKEN: ${SLACK_APP_TOKEN}
       AGENT_BASE_URL: http://agent:8000
+      BU5_BASE_URL: http://bu5_care_operations:8006
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       agent:
+        condition: service_healthy
+      bu5_care_operations:
         condition: service_healthy
     restart: unless-stopped
 
@@ -33,6 +87,7 @@ services:
       BU2_BASE_URL: http://bu2_sales_maintenance:8002
       BU3_BASE_URL: http://bu3_billing_subscription:8003
       BU4_BASE_URL: http://bu4_support_fulfillment:8004
+      BU5_BASE_URL: http://bu5_care_operations:8006
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
     depends_on:
@@ -44,8 +99,16 @@ services:
         condition: service_healthy
       bu4_support_fulfillment:
         condition: service_healthy
+      bu5_care_operations:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -73,7 +136,13 @@ services:
     volumes:
       - ./docs/bu1:/docs/bu1:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -101,7 +170,13 @@ services:
     volumes:
       - ./docs/bu2:/docs/bu2:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -129,7 +204,13 @@ services:
     volumes:
       - ./docs/bu3:/docs/bu3:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -157,7 +238,51 @@ services:
     volumes:
       - ./docs/bu4:/docs/bu4:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  bu5_care_operations:
+    build:
+      context: ./services/bu5_care_operations
+      dockerfile: Dockerfile
+    container_name: ritecare-bu5
+    ports:
+      - "8006:8006"
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: appointment.booked
+      KAFKA_GROUP_ID: bu5-care-operations
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_MEMBERS_CHANNEL: ${SLACK_MEMBERS_CHANNEL:-rc-care-members}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENV: ${ENV:-production}
+      APP_PORT: 8006
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -182,7 +307,13 @@ services:
     volumes:
       - uploads:/docs/uploads
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -195,7 +326,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
@@ -212,13 +343,7 @@ services:
       - ./services/ingestion_service:/opt/airflow/ingestion_service
       - uploads:/docs/uploads
       - airflow_db:/opt/airflow
-    command: >
-      bash -c "airflow db migrate &&
-               airflow users create --username $${AIRFLOW_ADMIN_USERNAME:-admin}
-                 --password $${AIRFLOW_ADMIN_PASSWORD:-admin}
-                 --firstname Admin --lastname User
-                 --role Admin --email admin@ritecare.com &&
-               airflow webserver & airflow scheduler"
+    command: bash -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@ritecare.com || true && rm -f /opt/airflow/airflow-webserver.pid && airflow webserver --port 8080 & airflow scheduler & wait"
     restart: unless-stopped
 
 volumes:

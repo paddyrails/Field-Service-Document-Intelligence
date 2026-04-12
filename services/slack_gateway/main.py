@@ -19,11 +19,12 @@ from slack_bolt.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.aiohttp import AsyncSocketModeHandler
 
 from config import settings
-from handlers import handle_message
+from handlers import handle_claim_action, handle_message
 
 
 app = AsyncApp(token=settings.slack_bot_token)
 app.event("message")(handle_message)
+app.action("claim_visit")(handle_claim_action)
 
 
 async def main() -> None:

@@ -3,19 +3,22 @@ from ritecare_tools.tools.bu1_tools import get_customer_by_id, search_onboarding
 from ritecare_tools.tools.bu2_tools import get_contract_by_id, list_visits, search_service_manuals
 from ritecare_tools.tools.bu3_tools import get_subscription, list_invoices, search_billing_statements
 from ritecare_tools.tools.bu4_tools import get_ticket_by_id, list_tickets, search_knowledge_base
+from ritecare_tools.tools.bu5_tools import get_visit_by_id, list_patient_visits, search_care_documents
 
 _CRUD_TOOLs: dict[str, list] = {
     "BU1": [get_customer_by_id],
     "BU2": [get_contract_by_id, list_visits],
     "BU3": [get_subscription, list_invoices],
-    "BU4": [get_ticket_by_id, list_tickets]
+    "BU4": [get_ticket_by_id, list_tickets],
+    "BU5": [get_visit_by_id, list_patient_visits],
 }
 
 _RAG_TOOLS: dict[str, list] = {
     "BU1": [search_onboarding_docs],
     "BU2": [search_service_manuals],
     "BU3": [search_billing_statements],
-    "BU4": [search_knowledge_base]
+    "BU4": [search_knowledge_base],
+    "BU5": [search_care_documents],
 }
 
 def _parse_intent(intent: str) -> tuple[list[str], str]:

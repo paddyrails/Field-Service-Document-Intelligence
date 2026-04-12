@@ -17,6 +17,8 @@ COPY db/ ./db/
 COPY agent/ ./agent/
 COPY ritecare_tools/ ./ritecare_tools/
 COPY agent_api/ ./agent_api/
+COPY dao/ ./dao/
+COPY service/ ./service/
 
 EXPOSE 8000
 

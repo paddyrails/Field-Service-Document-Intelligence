@@ -12,6 +12,7 @@ _VECTOR_COLLECTIONS = {
     "BU2": "bu2_document_chunks",
     "BU3": "bu3_document_chunks",
     "BU4": "bu4_document_chunks",
+    "BU5": "bu5_document_chunks",
 }
 
 _open_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)

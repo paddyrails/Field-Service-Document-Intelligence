@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     bu2_base_url: str = "http://localhost:8002"
     bu3_base_url: str = "http://localhost:8003"
     bu4_base_url: str = "http://localhost:8004"
+    bu5_base_url: str = "http://localhost:8006"
     
     #RAG
     rag_chunk_size:int = 500

@@ -10,7 +10,7 @@ def get_client() -> AsyncIOMotorClient:
     return _client
 
 def get_database() -> AsyncIOMotorDatabase:
-    return get_client()[settings.mongo_db_name]
+    return get_client()[settings.mongodb_db_name]
 
 async def close_client() -> None:
     global _client
@@ -19,7 +19,7 @@ async def close_client() -> None:
     return _client
 
 def get_database() -> AsyncIOMotorDatabase:
-    return get_client()[settings.mongo_db_name]
+    return get_client()[settings.mongodb_db_name]
 
 async def close_client() -> None:
     global _client

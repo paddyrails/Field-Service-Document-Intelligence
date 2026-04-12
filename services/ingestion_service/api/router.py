@@ -37,11 +37,12 @@ async def ingest(
     file: UploadFile = File(...),
     bu: str = Form(...),
     customer_id: str = Form(""),
+    service_type: str = Form(""),
     orchestrator: IngestionOrchestrator = Depends(get_orchestrator),
 ) -> IngestResponse:
     """Accept a file upload, save it, and trigger an Airflow DAG run."""
     file_bytes = await file.read()
-    result = await orchestrator.trigger(file_bytes, file.filename, bu, customer_id)
+    result = await orchestrator.trigger(file_bytes, file.filename, bu, customer_id, service_type)
     return IngestResponse(**result)
 
 

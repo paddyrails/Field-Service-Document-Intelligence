@@ -11,6 +11,8 @@ dependencies = [
     "pydantic-settings>=2.4",
     "python-dotenv>=1.0",
     "structlog>=24.0",
+    "openai>=1.50", 
+    "tiktoken>=0.7",
 ]
 
 [project.optional-dependencies]
