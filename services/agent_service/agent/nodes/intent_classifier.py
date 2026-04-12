@@ -34,12 +34,32 @@ Examples:
 - "Get visit V789 details and show me the care preparation guidelines" → INTENT: BU5, TOOLS: BOTH
 """
 
-async def intent_classifier(state: AgentState) -> dict:
-    user_message = state["messages"][-1]
+def _infer_tool_type(query: str) -> str:
+    """Infer CRUD/RAG/BOTH from simple keyword matching — used when BU is already known."""
+    q = query.lower()
+    is_rag = any(k in q for k in ("how", "what is", "what are", "procedure", "protocol", "guideline", "manual", "explain", "describe"))
+    is_crud = any(k in q for k in ("show", "get", "find", "list", "status", "id", "fetch", "lookup"))
+    if is_rag and is_crud:
+        return "BOTH"
+    if is_rag:
+        return "RAG"
+    if is_crud:
+        return "CRUD"
+    return "BOTH"
 
+
+async def intent_classifier(state: AgentState) -> dict:
+    bu_hint = state.get("bu_hint", "")
+
+    if bu_hint:
+        # Channel already tells us the BU — skip the LLM call entirely
+        tool_type = _infer_tool_type(state["messages"][-1].content)
+        return {"intent": f"INTENT: {bu_hint}, TOOLS: {tool_type}"}
+
+    # No BU hint — fall back to LLM classification
+    user_message = state["messages"][-1]
     response = await _llm.ainvoke([
         SystemMessage(content=CLASSIFIER_PROMPT),
-        HumanMessage(content=user_message.content)
+        HumanMessage(content=user_message.content),
     ])
-
     return {"intent": response.content.strip()}

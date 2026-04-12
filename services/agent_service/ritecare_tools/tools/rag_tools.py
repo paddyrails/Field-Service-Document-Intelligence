@@ -45,7 +45,7 @@ async def _search_collection(
                 "path": "embedding",
                 "queryVector": query_vector,
                 "numCandidates": top_k * 10,
-                "limit": "top_k"
+                "limit": top_k
             }
         },
         {
@@ -53,7 +53,7 @@ async def _search_collection(
                 "_id": 0,
                 "text": 1,
                 "metadata": 1,
-                "score": {"$meta": "vectorSearchStore"}
+                "score": {"$meta": "vectorSearchScore"}
             }
         }
     ]
@@ -99,7 +99,7 @@ async def search_bu_documents(query: str, bu: str, top_k: int | None = None) -> 
     k = top_k or settings.rag_top_k
     collection_name = _VECTOR_COLLECTIONS.get(bu.upper())
     if not collection_name:
-        return {"error": f"Unknown BU: {bu}"}
+        return [{"error": f"Unknown BU: {bu}"}]
     
     db = get_database()
     query_vector = await _embed_query(query)

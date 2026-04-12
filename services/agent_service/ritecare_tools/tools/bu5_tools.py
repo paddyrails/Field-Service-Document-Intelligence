@@ -49,18 +49,13 @@ async def _extract_patient_id(query: str) -> str | None:
     return None if result == "NONE" else result
 
 
-async def _extract_service_type(query: str) -> str | None:
-    response = await _llm.ainvoke([
-        SystemMessage(content=(
-            "Identify if the user query mentions a specific care service type. "
-            f"Valid service types are: {', '.join(_SERVICE_TYPES)}. "
-            "Reply with ONLY the matching service type exactly as listed above. "
-            "If no service type is mentioned, reply with: NONE"
-        )),
-        HumanMessage(content=query),
-    ])
-    result = response.content.strip()
-    return None if result == "NONE" else result
+def _find_service_type(query: str) -> str | None:
+    """Direct string match — faster and more reliable than an LLM call."""
+    query_lower = query.lower()
+    for st in _SERVICE_TYPES:
+        if st in query_lower:
+            return st
+    return None
 
 
 async def get_visit_by_id(query: str) -> dict:
@@ -106,7 +101,7 @@ async def search_care_documents(query: str) -> list[str]:
     RAG tool — searches BU5 care operations documents.
     Optionally filters by service type if mentioned in the query.
     """
-    service_type = await _extract_service_type(query)
+    service_type = _find_service_type(query)
 
     payload: dict = {"query": query, "top_k": settings.rag_top_k}
     if service_type:

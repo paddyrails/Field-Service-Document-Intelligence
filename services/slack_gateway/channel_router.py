@@ -1,10 +1,14 @@
-# The three back-office Slack channels this gateway listens to.
+# Slack channels this gateway listens to, mapped to their BU.
 # Channel names (without #) must match exactly what is configured in Slack.
-WATCHED_CHANNELS = {
-    "rc_help_sales_backoffice",
-    "rc_help_customer_profile_backoffice",
-    "rc_help_billing_fulfillment_backoffice",
+CHANNEL_BU_MAP: dict[str, str] = {
+    "rc_help_customer_profile_backoffice": "BU1",
+    "rc_help_sales_backoffice": "BU2",
+    "rc_help_billing_fulfillment_backoffice": "BU3",
+    "rc_help_support_backoffice": "BU4",
+    "rc_care_members": "BU5",
 }
+
+WATCHED_CHANNELS = set(CHANNEL_BU_MAP.keys())
 
 
 async def get_channel_name(client, channel_id: str) -> str | None:
@@ -17,5 +21,9 @@ async def get_channel_name(client, channel_id: str) -> str | None:
 
 
 def is_watched(channel_name: str) -> bool:
-    """Returns True if this channel is one the gateway should respond to."""
     return channel_name in WATCHED_CHANNELS
+
+
+def get_bu(channel_name: str) -> str | None:
+    """Returns the BU for a channel, or None if unmapped."""
+    return CHANNEL_BU_MAP.get(channel_name)

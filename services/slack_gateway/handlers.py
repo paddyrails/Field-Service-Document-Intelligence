@@ -1,6 +1,6 @@
 import httpx
 
-from channel_router import get_channel_name, is_watched
+from channel_router import get_bu, get_channel_name, is_watched
 from config import settings
 
 
@@ -125,14 +125,19 @@ async def handle_message(body: dict, say, client, logger) -> None:
 
     try:
         async with httpx.AsyncClient() as http:
+            payload: dict = {
+                "query": text,
+                "session_id": session_id,
+                "channel": channel_name,
+                "user_id": user_id,
+            }
+            bu = get_bu(channel_name)
+            if bu:
+                payload["bu_hint"] = bu
+
             response = await http.post(
                 f"{settings.agent_base_url}/query",
-                json={
-                    "query": text,
-                    "session_id": session_id,
-                    "channel": channel_name,
-                    "user_id": user_id,
-                },
+                json=payload,
                 timeout=60.0,
             )
             response.raise_for_status()

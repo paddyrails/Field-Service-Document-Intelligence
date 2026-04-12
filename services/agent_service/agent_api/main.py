@@ -24,6 +24,7 @@ class QueryRequest(BaseModel):
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     channel: str = "cli"
     user_id: str = "anonymous"
+    bu_hint: str | None = None   # set by slack_gateway when channel maps to a known BU
 
 
 class QueryResponse(BaseModel):
@@ -50,6 +51,7 @@ async def query(
         "tool_results": [],
         "session_id": request.session_id,
         "channel": request.channel,
+        "bu_hint": request.bu_hint or "",
         "final_response": "",
     }
 
