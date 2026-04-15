@@ -4,10 +4,9 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-    #OpenAI
-    openai_api_key:str
-    openai_chat_model:str = "gpt-4o-mini"
-    openai_embedding_model: str = "text-embedding-3-small"
+    google_api_key: str
+    google_chat_model: str = "gemini-2.5-flash"
+    google_embedding_model:str = "gemini-embedding-001"
 
     #MongoDB
     mongodb_uri:str

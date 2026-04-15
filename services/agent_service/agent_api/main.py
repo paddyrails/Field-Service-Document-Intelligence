@@ -1,23 +1,16 @@
-"""
-RiteCare Agent API — exposes the LangGraph agent over HTTP.
-
-POST /query  →  runs the agent and returns the response.
-GET  /health →  liveness check.
-"""
-
 import uuid
 
 import uvicorn
 from fastapi import Depends, FastAPI
-from langchain_core.messages import HumanMessage
+from google.adk.runners import Runner
+from google.genai import types
+from agent.agent import root_agent
+from agent.session import MongoSessionService
 from pydantic import BaseModel, Field
 
-from agent.graph import agent
-from agent_api.dependencies import get_conversation_service
-from service.conversation_service import ConversationService
-
-app = FastAPI(title="RiteCare Agent API", version="0.1.0")
-
+app = FastAPI(title="RiteCare Agent API", version="2.0.0")
+session_service = MongoSessionService()
+runner = Runner(agent=root_agent, app_name="ritecare", session_service=session_service)
 
 class QueryRequest(BaseModel):
     query: str
@@ -40,33 +33,23 @@ async def health() -> dict:
 @app.post("/query", response_model=QueryResponse)
 async def query(
     request: QueryRequest,
-    conv_service: ConversationService = Depends(get_conversation_service),
-) -> QueryResponse:
-    history = await conv_service.load_history(request.session_id)
-
-    state = {
-        "messages": history + [HumanMessage(content=request.query)],
-        "intent": "",
-        "tool_calls": [],
-        "tool_results": [],
-        "session_id": request.session_id,
-        "channel": request.channel,
-        "bu_hint": request.bu_hint or "",
-        "final_response": "",
-    }
-
-    result = await agent.ainvoke(state)
-    response = result.get("final_response", "Sorry, I could not generate a response.")
-
-    await conv_service.save_turn(
-        session_id=request.session_id,
-        channel=request.channel,
-        user_id=request.user_id,
-        user_text=request.query,
-        ai_text=response,
+):
+    content = types.Content(
+        role="user",
+        parts=[types.Part(text=request.query)],
     )
 
-    return QueryResponse(response=response, session_id=request.session_id)
+    response_text = ""
+    async for event in runner.run_async(
+        user_id=request.user_id,
+        session_id=request.session_id,
+        new_message=content
+    ):
+        if event.is_final_response() and event.content:
+            response_text = event.content.parts[0].text
+    
+    return {"response": response_text, "session_id": request.session_id}
+    
 
 
 if __name__ == "__main__":

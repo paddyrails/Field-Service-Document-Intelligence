@@ -7,9 +7,9 @@ class Setttings(BaseSettings):
     mongodb_uri: str
     mongodb_db_name: str = "ritecare"
 
-    #OPenAI
-    openai_api_key: str
-    openai_embedding_model:str = "text-embedding-3-small"
+    #Google GenAI
+    google_api_key: str
+    google_embedding_model: str = "gemini-embedding-001"
 
     #RAG
     rag_chunk_size: int = 500

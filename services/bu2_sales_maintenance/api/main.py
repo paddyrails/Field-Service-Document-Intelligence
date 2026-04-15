@@ -29,6 +29,7 @@ app = FastAPI(
     title="RiteCare BU2 - Sales & Maintenance",
     description="API for managing service contracts and field visits",
     version="0.1.0",
+    root_path="/bu2",
     lifespan=lifespan,
 )
 

@@ -29,6 +29,7 @@ app = FastAPI(
     title="RiteCare BU4 - Support & Fulfillment",
     description="API for managing customer support tickets",
     version="0.1.0",
+    root_path="/bu4",
     lifespan=lifespan,
 )
 

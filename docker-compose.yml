@@ -1,4 +1,23 @@
 services:
+  # ── API Gateway ──────────────────────────────────────────────────────────────
+
+  traefik:
+    image: traefik:v3.0
+    container_name: ritecare-gateway
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80" # all external HTTP traffic
+      - "8888:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  # ── Kafka ─────────────────────────────────────────────────────────────────────
+
   kafka:
     image: apache/kafka:latest
     container_name: ritecare-kafka
@@ -16,26 +35,35 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 30s
     restart: unless-stopped
 
+  # ── Appointment Service ───────────────────────────────────────────────────────
+
   appointment_service:
     build:
       context: ./services/appointment_service
       dockerfile: Dockerfile
     container_name: ritecare-appointment
-    ports:
-      - "8007:8007"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: appointment.booked
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8007
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.appointment.rule=PathPrefix(`/appointments`)"
+      - "traefik.http.routers.appointment.entrypoints=web"
+      - "traefik.http.services.appointment.loadbalancer.server.port=8007"
     depends_on:
       kafka:
         condition: service_healthy
@@ -52,6 +80,8 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+
+  # ── Slack Gateway (outbound Socket Mode — not behind Traefik) ─────────────────
 
   slack_gateway:
     build:
@@ -71,19 +101,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ── Agent ─────────────────────────────────────────────────────────────────────
+
   agent:
     build:
       context: ./services/agent_service
       dockerfile: Dockerfile
     container_name: ritecare-agent
-    ports:
-      - "8000:8000"
     environment:
       MONGODB_URI: ${MONGODB_URI}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GOOGLE_CHAT_MODEL: ${GOOGLE_CHAT_MODEL:-gemini-2.5-flash}
+      GOOGLE_EMBEDDING_MODEL: ${GOOGLE_EMBEDDING_MODEL:-gemini-embedding-001}
       RAG_TOP_K: ${RAG_TOP_K:-5}
       BU1_BASE_URL: http://bu1_onboarding:8001
       BU2_BASE_URL: http://bu2_sales_maintenance:8002
@@ -92,6 +122,11 @@ services:
       BU5_BASE_URL: http://bu5_care_operations:8006
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.agent.rule=PathPrefix(`/query`) || PathPrefix(`/health`)"
+      - "traefik.http.routers.agent.entrypoints=web"
+      - "traefik.http.services.agent.loadbalancer.server.port=8000"
     depends_on:
       bu1_onboarding:
         condition: service_healthy
@@ -117,24 +152,31 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  # ── BU Services ───────────────────────────────────────────────────────────────
+
   bu1_onboarding:
     build:
       context: ./services/bu1_onboarding
       dockerfile: Dockerfile
     container_name: ritecare-bu1
-    ports:
-      - "8001:8001"
     environment:
       MONGODB_URI: ${MONGODB_URI}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GOOGLE_EMBEDDING_MODEL: ${GOOGLE_EMBEDDING_MODEL:-gemini-embedding-001}
       RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
       RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
       RAG_TOP_K: ${RAG_TOP_K:-5}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8001
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bu1.rule=PathPrefix(`/bu1`)"
+      - "traefik.http.routers.bu1.entrypoints=web"
+      - "traefik.http.middlewares.bu1-strip.stripprefix.prefixes=/bu1"
+      - "traefik.http.routers.bu1.middlewares=bu1-strip"
+      - "traefik.http.services.bu1.loadbalancer.server.port=8001"
     volumes:
       - ./docs/bu1:/docs/bu1:ro
     healthcheck:
@@ -156,19 +198,24 @@ services:
       context: ./services/bu2_sales_maintenance
       dockerfile: Dockerfile
     container_name: ritecare-bu2
-    ports:
-      - "8002:8002"
     environment:
       MONGODB_URI: ${MONGODB_URI}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GOOGLE_EMBEDDING_MODEL: ${GOOGLE_EMBEDDING_MODEL:-gemini-embedding-001}
       RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
       RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
       RAG_TOP_K: ${RAG_TOP_K:-5}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8002
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bu2.rule=PathPrefix(`/bu2`)"
+      - "traefik.http.routers.bu2.entrypoints=web"
+      - "traefik.http.middlewares.bu2-strip.stripprefix.prefixes=/bu2"
+      - "traefik.http.routers.bu2.middlewares=bu2-strip"
+      - "traefik.http.services.bu2.loadbalancer.server.port=8002"
     volumes:
       - ./docs/bu2:/docs/bu2:ro
     healthcheck:
@@ -190,19 +237,24 @@ services:
       context: ./services/bu3_billing_subscription
       dockerfile: Dockerfile
     container_name: ritecare-bu3
-    ports:
-      - "8003:8003"
     environment:
       MONGODB_URI: ${MONGODB_URI}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GOOGLE_EMBEDDING_MODEL: ${GOOGLE_EMBEDDING_MODEL:-gemini-embedding-001}
       RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
       RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
       RAG_TOP_K: ${RAG_TOP_K:-5}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8003
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bu3.rule=PathPrefix(`/bu3`)"
+      - "traefik.http.routers.bu3.entrypoints=web"
+      - "traefik.http.middlewares.bu3-strip.stripprefix.prefixes=/bu3"
+      - "traefik.http.routers.bu3.middlewares=bu3-strip"
+      - "traefik.http.services.bu3.loadbalancer.server.port=8003"
     volumes:
       - ./docs/bu3:/docs/bu3:ro
     healthcheck:
@@ -224,19 +276,24 @@ services:
       context: ./services/bu4_support_fulfillment
       dockerfile: Dockerfile
     container_name: ritecare-bu4
-    ports:
-      - "8004:8004"
     environment:
       MONGODB_URI: ${MONGODB_URI}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GOOGLE_EMBEDDING_MODEL: ${GOOGLE_EMBEDDING_MODEL:-gemini-embedding-001}
       RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-500}
       RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-50}
       RAG_TOP_K: ${RAG_TOP_K:-5}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8004
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bu4.rule=PathPrefix(`/bu4`)"
+      - "traefik.http.routers.bu4.entrypoints=web"
+      - "traefik.http.middlewares.bu4-strip.stripprefix.prefixes=/bu4"
+      - "traefik.http.routers.bu4.middlewares=bu4-strip"
+      - "traefik.http.services.bu4.loadbalancer.server.port=8004"
     volumes:
       - ./docs/bu4:/docs/bu4:ro
     healthcheck:
@@ -258,13 +315,11 @@ services:
       context: ./services/bu5_care_operations
       dockerfile: Dockerfile
     container_name: ritecare-bu5
-    ports:
-      - "8006:8006"
     environment:
       MONGODB_URI: ${MONGODB_URI}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GOOGLE_EMBEDDING_MODEL: ${GOOGLE_EMBEDDING_MODEL:-gemini-embedding-001}
       RAG_TOP_K: ${RAG_TOP_K:-5}
       AGENT_BASE_URL: http://agent:8000
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -275,6 +330,13 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
       APP_PORT: 8006
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bu5.rule=PathPrefix(`/bu5`)"
+      - "traefik.http.routers.bu5.entrypoints=web"
+      - "traefik.http.middlewares.bu5-strip.stripprefix.prefixes=/bu5"
+      - "traefik.http.routers.bu5.middlewares=bu5-strip"
+      - "traefik.http.services.bu5.loadbalancer.server.port=8006"
     depends_on:
       kafka:
         condition: service_healthy
@@ -292,13 +354,13 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # ── Ingestion Service ─────────────────────────────────────────────────────────
+
   ingestion_service:
     build:
       context: ./services/ingestion_service
       dockerfile: Dockerfile
     container_name: ritecare-ingestion
-    ports:
-      - "8005:8005"
     environment:
       AIRFLOW_BASE_URL: http://airflow:8080
       AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-admin}
@@ -307,6 +369,11 @@ services:
       UPLOAD_DIR: /docs/uploads
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENV: ${ENV:-production}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ingestion.rule=PathPrefix(`/ingest`)"
+      - "traefik.http.routers.ingestion.entrypoints=web"
+      - "traefik.http.services.ingestion.loadbalancer.server.port=8005"
     volumes:
       - uploads:/docs/uploads
     healthcheck:
@@ -323,6 +390,8 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # ── Airflow (admin only — keep its own port) ──────────────────────────────────
+
   airflow:
     image: apache/airflow:2.9.0
     container_name: ritecare-airflow
@@ -336,11 +405,11 @@ services:
       AIRFLOW_ADMIN_USERNAME: ${AIRFLOW_USERNAME:-admin}
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
       PYTHONPATH: /opt/airflow/ingestion_service
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
       MONGODB_URI: ${MONGODB_URI}
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-ritecare}
       INGESTION_SERVICE_URL: http://ingestion_service:8005
-      _PIP_ADDITIONAL_REQUIREMENTS: "openai pymongo pymongo[srv] pypdf tiktoken"
+      _PIP_ADDITIONAL_REQUIREMENTS: "google-genai pymongo pymongo[srv] pypdf tiktoken"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./services/ingestion_service:/opt/airflow/ingestion_service

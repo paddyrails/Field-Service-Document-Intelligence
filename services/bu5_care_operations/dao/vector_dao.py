@@ -1,10 +1,10 @@
-import openai
+from google import genai
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from common.config import settings
 from common.database.collections import BU5_DOCUMENT_CHUNKS
 
-_client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
+_client = genai.Client(api_key=settings.google_api_key)
 
 
 class VectorDAO:
@@ -17,11 +17,11 @@ class VectorDAO:
         top_k: int = 5,
         service_type: str | None = None,
     ) -> list[dict]:
-        response = await _client.embeddings.create(
-            model=settings.openai_embedding_model,
-            input=query,
+        response = _client.models.embed_content(
+            model=settings.google_embedding_model,
+            contents=query,
         )
-        query_vector = response.data[0].embedding
+        query_vector = response.embeddings[0].values
 
         pipeline: list[dict] = [
             {

@@ -8,7 +8,6 @@ Tasks:
     load   → chunk  → embed  → store  → notify
 """
 
-import asyncio
 import os
 import sys
 
@@ -36,7 +35,7 @@ INGESTION_SERVICE_URL = os.environ.get("INGESTION_SERVICE_URL", "http://ingestio
 
 # ── Task functions ─────────────────────────────────────────────────────────────
 
-def load(** context) -> str:
+def load(**context) -> str:
     """Read raw text from the uploaded file."""
     file_path: str = context["dag_run"].conf["file_path"]
 
@@ -61,10 +60,10 @@ def chunk(**context) -> list[str]:
 
 
 def embed(**context) -> list[dict]:
-    """Embed chunks using OpenAI."""
+    """Embed chunks using Google GenAI."""
     conf = context["dag_run"].conf
     chunks: list[str] = context["ti"].xcom_pull(task_ids="chunk", key="chunks")
-    embedded = asyncio.run(embed_chunks(chunks, bu=conf["bu"], customer_id=conf.get("customer_id", ""), service_type=conf.get("service_type", "")))
+    embedded = embed_chunks(chunks, bu=conf["bu"], customer_id=conf.get("customer_id", ""), service_type=conf.get("service_type", ""))
     context["ti"].xcom_push(key="embedded", value=embedded)
     return embedded
 

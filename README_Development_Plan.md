@@ -20,46 +20,46 @@ Slack Message
 
 Document Upload (offline / async)
     → Document Ingestion Pipeline (per BU)
-        → Chunking + Embedding (OpenAI text-embedding-3-small)
+        → Chunking + Embedding (OpenAI gemini-embedding-001)
         → MongoDB Atlas Vector Search index
 ```
 
 ### RiteCare Business Units
 
-| Unit | Microservice | Responsibility | RAG Documents |
-|------|-------------|----------------|---------------|
-| BU1  | Customer Onboarding | New customer registration, KYC, account setup | KYC forms, ID scans, onboarding checklists |
-| BU2  | Sales & Maintenance | Service contracts, field visits, maintenance schedules | Equipment manuals, service procedures, contract PDFs |
-| BU3  | Billing & Subscription | Invoices, subscription plans, payment tracking | Invoice PDFs, billing statements, plan documents |
-| BU4  | Support & Fulfillment | Tickets, SLAs, parts fulfillment, escalations | KB articles, resolved ticket history, troubleshooting guides |
+| Unit | Microservice           | Responsibility                                         | RAG Documents                                                |
+| ---- | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------------ |
+| BU1  | Customer Onboarding    | New customer registration, KYC, account setup          | KYC forms, ID scans, onboarding checklists                   |
+| BU2  | Sales & Maintenance    | Service contracts, field visits, maintenance schedules | Equipment manuals, service procedures, contract PDFs         |
+| BU3  | Billing & Subscription | Invoices, subscription plans, payment tracking         | Invoice PDFs, billing statements, plan documents             |
+| BU4  | Support & Fulfillment  | Tickets, SLAs, parts fulfillment, escalations          | KB articles, resolved ticket history, troubleshooting guides |
 
 ### Slack Back-Office Channels
 
-| Channel | Purpose |
-|---------|---------|
-| `help-sales-backoffice` | BU1 + BU2 queries |
-| `help-customer-profile-backoffice` | Customer profile lookups |
-| `help-billing-fulfillment-backoffice` | BU3 + BU4 queries |
+| Channel                               | Purpose                  |
+| ------------------------------------- | ------------------------ |
+| `help-sales-backoffice`               | BU1 + BU2 queries        |
+| `help-customer-profile-backoffice`    | Customer profile lookups |
+| `help-billing-fulfillment-backoffice` | BU3 + BU4 queries        |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Language | Python 3.12 |
-| Microservices | FastAPI |
-| AI Orchestration | LangGraph |
-| Tool Protocol | MCP (Model Context Protocol) |
-| LLM | OpenAI GPT-4o-mini |
-| Embeddings | OpenAI text-embedding-3-small |
-| Vector Search | MongoDB Atlas Vector Search |
-| Database | MongoDB Atlas (Motor async driver) |
-| Data Validation | Pydantic v2 |
-| Package Manager | uv (pyproject.toml) |
-| Testing | pytest + httpx |
-| Containerisation | Docker + docker-compose |
-| Slack Integration | Slack Bolt for Python (Phase 6) |
+| Layer             | Technology                         |
+| ----------------- | ---------------------------------- |
+| Language          | Python 3.12                        |
+| Microservices     | FastAPI                            |
+| AI Orchestration  | LangGraph                          |
+| Tool Protocol     | MCP (Model Context Protocol)       |
+| LLM               | OpenAI GPT-4o-mini                 |
+| Embeddings        | OpenAI gemini-embedding-001        |
+| Vector Search     | MongoDB Atlas Vector Search        |
+| Database          | MongoDB Atlas (Motor async driver) |
+| Data Validation   | Pydantic v2                        |
+| Package Manager   | uv (pyproject.toml)                |
+| Testing           | pytest + httpx                     |
+| Containerisation  | Docker + docker-compose            |
+| Slack Integration | Slack Bolt for Python (Phase 6)    |
 
 ---
 
@@ -69,12 +69,12 @@ This is a **monorepo**. All BU microservices and the AI orchestration layer live
 
 ### Service Ports
 
-| Service | Path | Port |
-|---------|------|------|
-| BU1 — Customer Onboarding | `services/bu1_onboarding/` | 8001 |
-| BU2 — Sales & Maintenance | `services/bu2_sales_maintenance/` | 8002 |
+| Service                      | Path                                 | Port |
+| ---------------------------- | ------------------------------------ | ---- |
+| BU1 — Customer Onboarding    | `services/bu1_onboarding/`           | 8001 |
+| BU2 — Sales & Maintenance    | `services/bu2_sales_maintenance/`    | 8002 |
 | BU3 — Billing & Subscription | `services/bu3_billing_subscription/` | 8003 |
-| BU4 — Support & Fulfillment | `services/bu4_support_fulfillment/` | 8004 |
+| BU4 — Support & Fulfillment  | `services/bu4_support_fulfillment/`  | 8004 |
 
 ---
 
@@ -211,7 +211,7 @@ ritecare-bu{N}-{name}/
 ├── ingestion/                       # Document ingestion pipeline (async / offline)
 │   ├── __init__.py
 │   ├── chunker.py                   # Split documents into chunks
-│   ├── embedder.py                  # Call OpenAI text-embedding-3-small
+│   ├── embedder.py                  # Call OpenAI gemini-embedding-001
 │   ├── pipeline.py                  # Orchestrate chunker → embedder → vector_dao
 │   └── loaders/
 │       ├── __init__.py
@@ -261,13 +261,13 @@ ritecare-bu{N}-{name}/
 
 #### Layer Responsibilities
 
-| Layer | Responsibility | May import from |
-|-------|---------------|-----------------|
-| `api` | HTTP routing, request validation, response serialisation | `service`, `common` |
-| `service` | Business rules, orchestration, error handling | `dao`, `common` |
-| `dao` | All DB queries (CRUD + vector search) — no business logic | `common` |
-| `ingestion` | Document loading, chunking, embedding, indexing — runs offline | `dao`, `common` |
-| `common` | Config, models, schemas, DB client, logging, limiting | nothing above |
+| Layer       | Responsibility                                                 | May import from     |
+| ----------- | -------------------------------------------------------------- | ------------------- |
+| `api`       | HTTP routing, request validation, response serialisation       | `service`, `common` |
+| `service`   | Business rules, orchestration, error handling                  | `dao`, `common`     |
+| `dao`       | All DB queries (CRUD + vector search) — no business logic      | `common`            |
+| `ingestion` | Document loading, chunking, embedding, indexing — runs offline | `dao`, `common`     |
+| `common`    | Config, models, schemas, DB client, logging, limiting          | nothing above       |
 
 ---
 
@@ -280,12 +280,12 @@ ritecare-bu{N}-{name}/
 Document (PDF / text)
     → pdf_loader / text_loader        (extract raw text)
     → chunker                         (split into ~500 token chunks)
-    → embedder                        (OpenAI text-embedding-3-small)
+    → embedder                        (OpenAI gemini-embedding-001)
     → vector_dao.insert_chunk()       (store in MongoDB Atlas Vector index)
 
 ── Retrieval (at query time via MCP) ────────────────────────────────
 User query
-    → embed query (text-embedding-3-small)
+    → embed query (gemini-embedding-001)
     → vector_dao.search(query_vector, top_k=5)   (cosine similarity)
     → top-K chunks returned as context
     → injected into LangGraph agent alongside CRUD tool results
@@ -294,12 +294,12 @@ User query
 
 ### RAG per Business Unit
 
-| BU | Vector Collection | Document Types | Example Query |
-|----|------------------|----------------|---------------|
-| BU1 | `bu1_document_chunks` | KYC forms, onboarding checklists | *"What documents did customer C123 upload?"* |
-| BU2 | `bu2_document_chunks` | Service manuals, contract PDFs, field guides | *"How do I service the X200 pump unit?"* |
-| BU3 | `bu3_document_chunks` | Invoice PDFs, billing statements, plan terms | *"Why was customer C456 charged $500 in March?"* |
-| BU4 | `bu4_document_chunks` | KB articles, resolved tickets, troubleshooting guides | *"Has this fault been seen before? How was it fixed?"* |
+| BU  | Vector Collection     | Document Types                                        | Example Query                                          |
+| --- | --------------------- | ----------------------------------------------------- | ------------------------------------------------------ |
+| BU1 | `bu1_document_chunks` | KYC forms, onboarding checklists                      | _"What documents did customer C123 upload?"_           |
+| BU2 | `bu2_document_chunks` | Service manuals, contract PDFs, field guides          | _"How do I service the X200 pump unit?"_               |
+| BU3 | `bu3_document_chunks` | Invoice PDFs, billing statements, plan terms          | _"Why was customer C456 charged $500 in March?"_       |
+| BU4 | `bu4_document_chunks` | KB articles, resolved tickets, troubleshooting guides | _"Has this fault been seen before? How was it fixed?"_ |
 
 ### MongoDB Atlas Vector Index (per BU collection)
 
@@ -326,14 +326,14 @@ User query
 
 ### RAG MCP Tools (in `mcp/tools/rag_tools.py`)
 
-| Tool | BU | Description |
-|------|----|-------------|
-| `search_onboarding_docs` | BU1 | Semantic search over KYC / onboarding documents |
-| `search_service_manuals` | BU2 | Semantic search over equipment manuals and field guides |
-| `search_contracts` | BU2 | Semantic search over contract PDFs |
-| `search_billing_statements` | BU3 | Semantic search over invoice and billing documents |
-| `search_knowledge_base` | BU4 | Semantic search over KB articles |
-| `search_resolved_tickets` | BU4 | Semantic search over past resolved support tickets |
+| Tool                        | BU  | Description                                             |
+| --------------------------- | --- | ------------------------------------------------------- |
+| `search_onboarding_docs`    | BU1 | Semantic search over KYC / onboarding documents         |
+| `search_service_manuals`    | BU2 | Semantic search over equipment manuals and field guides |
+| `search_contracts`          | BU2 | Semantic search over contract PDFs                      |
+| `search_billing_statements` | BU3 | Semantic search over invoice and billing documents      |
+| `search_knowledge_base`     | BU4 | Semantic search over KB articles                        |
+| `search_resolved_tickets`   | BU4 | Semantic search over past resolved support tickets      |
 
 ---
 
@@ -342,6 +342,7 @@ User query
 ---
 
 ### Phase 1 — Project Foundation (Main Repo)
+
 **Goal:** Working skeleton with config, logging, and shared utilities.
 
 - [ ] `pyproject.toml` — dependencies, project metadata
@@ -358,6 +359,7 @@ User query
 ---
 
 ### Phase 2 — MongoDB Document Models (Main Repo)
+
 **Goal:** Pydantic v2 conversation model for the agent with MongoDB `_id` handling.
 
 - [ ] `db/models/conversation.py` — Agent conversation (session_id, messages[], channel, user_id, created_at)
@@ -367,15 +369,18 @@ User query
 ---
 
 ### Phase 3 — RiteCare Microservices (BU1–BU4)
+
 **Goal:** Four independently runnable FastAPI services, each in its own repo, using the layered architecture (api → service → dao → common).
 
 Each microservice is built in this order per repo:
+
 1. `common/` — config, models (domain + document_chunk), schemas, database client, logger, rate limiter, exceptions
 2. `dao/` — MongoDB CRUD queries + vector search queries
 3. `service/` — business logic
 4. `api/` — routes, dependencies, app entry
 
 #### BU1 — Customer Onboarding (`ritecare-bu1-onboarding`, port 8001)
+
 - [ ] `common/` — CustomerModel, DocumentChunkModel, CustomerCreateSchema, CustomerResponseSchema, DB client
 - [ ] `dao/customer_dao.py` — insert, find_by_id, update_kyc
 - [ ] `dao/vector_dao.py` — insert_chunk, search (cosine similarity)
@@ -387,6 +392,7 @@ Each microservice is built in this order per repo:
   - `GET /customers/{id}/onboarding-status` — get onboarding progress
 
 #### BU2 — Sales & Maintenance (`ritecare-bu2-sales-maintenance`, port 8002)
+
 - [ ] `common/` — ContractModel, VisitModel, DocumentChunkModel, request/response schemas, DB client
 - [ ] `dao/contract_dao.py` + `dao/visit_dao.py` + `dao/vector_dao.py`
 - [ ] `service/contract_service.py` + `service/visit_service.py`
@@ -398,6 +404,7 @@ Each microservice is built in this order per repo:
   - `PATCH /visits/{id}` — update visit status
 
 #### BU3 — Billing & Subscription (`ritecare-bu3-billing-subscription`, port 8003)
+
 - [ ] `common/` — InvoiceModel, SubscriptionModel, DocumentChunkModel, request/response schemas, DB client
 - [ ] `dao/invoice_dao.py` + `dao/subscription_dao.py` + `dao/vector_dao.py`
 - [ ] `service/invoice_service.py` + `service/subscription_service.py`
@@ -409,6 +416,7 @@ Each microservice is built in this order per repo:
   - `PATCH /subscriptions/{customer_id}` — update plan
 
 #### BU4 — Support & Fulfillment (`ritecare-bu4-support-fulfillment`, port 8004)
+
 - [ ] `common/` — TicketModel, DocumentChunkModel, request/response schemas, DB client
 - [ ] `dao/ticket_dao.py` + `dao/vector_dao.py`
 - [ ] `service/ticket_service.py`
@@ -424,6 +432,7 @@ Each microservice is built in this order per repo:
 ---
 
 ### Phase 4 — LangGraph Agent (Main Repo)
+
 **Goal:** Fully working AI agent that receives a user query, routes through a state graph, selects the right CRUD and/or RAG MCP tools, combines results, persists the conversation, and returns an intelligent response.
 
 - [ ] `agent/state.py` — `AgentState` TypedDict (messages, intent, tool_calls, tool_results, session_id, channel)
@@ -435,6 +444,7 @@ Each microservice is built in this order per repo:
 - [ ] Persist conversation turns to MongoDB (`db/models/conversation.py`)
 
 **How LangGraph works here:**
+
 ```python
 graph = StateGraph(AgentState)
 graph.add_node("classify", intent_classifier)
@@ -451,6 +461,7 @@ result = await agent.ainvoke({"messages": [user_query], "session_id": session_id
 ```
 
 **Example combined flow:**
+
 ```
 Query: "How do I fix the pressure fault on customer C123's pump unit?"
   → classify:       intent=BU2+BU4, mode=CRUD+RAG
@@ -466,6 +477,7 @@ Query: "How do I fix the pressure fault on customer C123's pump unit?"
 ---
 
 ### Phase 5 — Slack Gateway (Deferred)
+
 **Goal:** Connect everything to Slack.
 
 - [ ] `slack_gateway/main.py` — Slack Bolt app
@@ -482,9 +494,9 @@ Query: "How do I fix the pressure fault on customer C123's pump unit?"
 
 ```env
 # OpenAI
-OPENAI_API_KEY=
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-OPENAI_CHAT_MODEL=gpt-4o-mini
+GOOGLE_API_KEY=
+GOOGLE_EMBEDDING_MODEL=gemini-embedding-001
+GOOGLE_CHAT_MODEL=gpt-4o-mini
 
 # MongoDB Atlas
 MONGODB_URI=
@@ -601,10 +613,10 @@ dev = [
 
 ## Current Status
 
-| Phase | Status |
-|-------|--------|
-| Phase 1 — Foundation (Main Repo) | Not started |
-| Phase 2 — MongoDB Models (Main Repo) | Not started |
+| Phase                                      | Status      |
+| ------------------------------------------ | ----------- |
+| Phase 1 — Foundation (Main Repo)           | Not started |
+| Phase 2 — MongoDB Models (Main Repo)       | Not started |
 | Phase 3 — RiteCare Microservices (BU1–BU4) | Not started |
-| Phase 4 — LangGraph Agent | Not started |
-| Phase 5 — Slack Gateway | Deferred |
+| Phase 4 — LangGraph Agent                  | Not started |
+| Phase 5 — Slack Gateway                    | Deferred    |

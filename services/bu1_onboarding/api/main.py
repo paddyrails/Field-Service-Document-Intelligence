@@ -28,6 +28,7 @@ app = FastAPI(
     title="RiteCare BU1 - Customer Onboarding",
     description="API for managing customer onboarding processes",
     version="0.1.0",
+    root_path="/bu1",
     lifespan=lifespan,
 )
 

@@ -1,4 +1,5 @@
 # RiteCare — Field Service Document Intelligence
+
 ## System Architecture
 
 ```mermaid
@@ -71,7 +72,7 @@ flowchart TD
         direction LR
         IL["loaders/\npdf_loader.py\ntext_loader.py"]
         IC["chunker.py\n~500 token chunks"]
-        IE["embedder.py\nOpenAI\ntext-embedding-3-small\n1536 dimensions"]
+        IE["embedder.py\nOpenAI\ngemini-embedding-001\n1536 dimensions"]
         IL --> IC --> IE
     end
 
@@ -156,16 +157,16 @@ flowchart TD
 
 ## Layer Responsibilities
 
-| Layer | Location | Responsibility |
-|-------|----------|----------------|
-| **User Interface** | `run_agent.py`, `test_agent.py` | Entry points — CLI chat and test runner |
-| **LangGraph Agent** | `agent/` | Orchestrates classify → execute → respond pipeline |
-| **RiteCare Tools** | `ritecare_tools/` | HTTP wrappers calling BU APIs + RAG vector search |
-| **BU Microservices** | `services/buN_*/` | FastAPI REST APIs — CRUD + ingest + RAG search |
-| **Ingestion Pipeline** | `services/buN_*/ingestion/` | PDF/text → chunks → embeddings → MongoDB |
-| **MongoDB Atlas** | Cloud | CRUD collections + Vector Search index per BU |
-| **Shared** | `shared/` | Config (Pydantic Settings), structured logging |
-| **DB Models** | `db/` | Conversation history model, Motor client singleton |
+| Layer                  | Location                        | Responsibility                                     |
+| ---------------------- | ------------------------------- | -------------------------------------------------- |
+| **User Interface**     | `run_agent.py`, `test_agent.py` | Entry points — CLI chat and test runner            |
+| **LangGraph Agent**    | `agent/`                        | Orchestrates classify → execute → respond pipeline |
+| **RiteCare Tools**     | `ritecare_tools/`               | HTTP wrappers calling BU APIs + RAG vector search  |
+| **BU Microservices**   | `services/buN_*/`               | FastAPI REST APIs — CRUD + ingest + RAG search     |
+| **Ingestion Pipeline** | `services/buN_*/ingestion/`     | PDF/text → chunks → embeddings → MongoDB           |
+| **MongoDB Atlas**      | Cloud                           | CRUD collections + Vector Search index per BU      |
+| **Shared**             | `shared/`                       | Config (Pydantic Settings), structured logging     |
+| **DB Models**          | `db/`                           | Conversation history model, Motor client singleton |
 
 ---
 
@@ -188,7 +189,7 @@ User query
 POST /ingest  (multipart PDF upload)
   → pdf_loader    →  extract raw text
   → chunker       →  split into ~500 token chunks
-  → embedder      →  OpenAI text-embedding-3-small (1536 dims)
+  → embedder      →  OpenAI gemini-embedding-001 (1536 dims)
   → vector_dao    →  insert chunks into buN_document_chunks
   → response      →  { "chunks_stored": N }
 ```
@@ -197,9 +198,9 @@ POST /ingest  (multipart PDF upload)
 
 ## Port Map
 
-| Service | Port |
-|---------|------|
-| BU1 — Customer Onboarding | 8001 |
-| BU2 — Sales & Maintenance | 8002 |
+| Service                      | Port |
+| ---------------------------- | ---- |
+| BU1 — Customer Onboarding    | 8001 |
+| BU2 — Sales & Maintenance    | 8002 |
 | BU3 — Billing & Subscription | 8003 |
-| BU4 — Support & Fulfillment | 8004 |
+| BU4 — Support & Fulfillment  | 8004 |

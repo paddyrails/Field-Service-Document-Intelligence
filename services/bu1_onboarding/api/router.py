@@ -1,4 +1,4 @@
-import openai
+from google import genai
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.dependencies import get_customer_service
@@ -6,6 +6,8 @@ from common.config import settings
 from common.schemas.request import CustomerCreateRequest, IngestRequest, KYCUpdateRequest
 from common.schemas.response import CustomerResponse, OnBoardingStatusResponse
 from service.customer_service import CustomerService
+
+_genai_client = genai.Client(api_key=settings.google_api_key)
 
 # ── Customer routes ───────────────────────────────────────────────────────────
 
@@ -85,12 +87,11 @@ async def rag_search(
     top_k = body.get("top_k", settings.rag_top_k)
     filters = body.get("filter")
 
-    _openai = openai.AsyncOpenAI(api_key=settings.openai_api_key)
-    response = await _openai.embeddings.create(
-        model=settings.openai_embedding_model,
-        input=query,
+    response = _genai_client.models.embed_content(
+        model=settings.google_embedding_model,
+        contents=query,
     )
-    query_vector = response.data[0].embedding
+    query_vector = response.embeddings[0].values
 
     results = await service.rag_search(query_vector, top_k=top_k, filters=filters)
     return {"results": results}

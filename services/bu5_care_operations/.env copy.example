@@ -3,8 +3,8 @@ MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=t
 MONGODB_DB_NAME=ritecare
 
 # OpenAI
-OPENAI_API_KEY=sk-...
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+GOOGLE_API_KEY=sk-...
+GOOGLE_EMBEDDING_MODEL=gemini-embedding-001
 
 # RAG
 RAG_TOP_K=5

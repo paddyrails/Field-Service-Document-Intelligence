@@ -31,6 +31,7 @@ app = FastAPI(
     title="RiteCare BU3 - Billing & Subscription",
     description="API for managing customer billing, invoices, and subscriptions",
     version="0.1.0",
+    root_path="/bu3",
     lifespan=lifespan,
 )
 

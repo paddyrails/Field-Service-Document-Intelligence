@@ -1,14 +1,6 @@
 import httpx
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
 from shared.config import settings
-
-_llm = ChatOpenAI(
-    model=settings.openai_chat_model,
-    temperature=0,
-    api_key=settings.openai_api_key,
-)
 
 _BASE_URL = settings.bu5_base_url
 
@@ -21,34 +13,6 @@ _SERVICE_TYPES = (
 )
 
 
-async def _extract_visit_id(query: str) -> str | None:
-    response = await _llm.ainvoke([
-        SystemMessage(content=(
-            "Extract the visit ID from the user query. "
-            "Visit IDs are alphanumeric strings or MongoDB ObjectIds. "
-            "Reply with ONLY the visit ID and nothing else. "
-            "If no visit ID is present, reply with: NONE"
-        )),
-        HumanMessage(content=query),
-    ])
-    result = response.content.strip()
-    return None if result == "NONE" else result
-
-
-async def _extract_patient_id(query: str) -> str | None:
-    response = await _llm.ainvoke([
-        SystemMessage(content=(
-            "Extract the patient ID from the user query. "
-            "Patient IDs are alphanumeric strings or MongoDB ObjectIds. "
-            "Reply with ONLY the patient ID and nothing else. "
-            "If no patient ID is present, reply with: NONE"
-        )),
-        HumanMessage(content=query),
-    ])
-    result = response.content.strip()
-    return None if result == "NONE" else result
-
-
 def _find_service_type(query: str) -> str | None:
     """Direct string match — faster and more reliable than an LLM call."""
     query_lower = query.lower()
@@ -58,14 +22,16 @@ def _find_service_type(query: str) -> str | None:
     return None
 
 
-async def get_visit_by_id(query: str) -> dict:
+async def get_visit_by_id(visit_id: str) -> dict:
     """
     CRUD tool — fetches a patient visit from BU5 by visit ID.
-    """
-    visit_id = await _extract_visit_id(query)
-    if not visit_id:
-        return {"error": "Could not extract visit ID from query"}
 
+    Args:
+        visit_id: The visit ID to look up (e.g. V789 or a MongoDB ObjectId)
+
+    Returns:
+        Visit record with patient name, service type, status, scheduled time
+    """
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"{_BASE_URL}/visits/{visit_id}",
@@ -77,14 +43,16 @@ async def get_visit_by_id(query: str) -> dict:
         return response.json()
 
 
-async def list_patient_visits(query: str) -> list[dict]:
+async def list_patient_visits(patient_id: str) -> list[dict]:
     """
     CRUD tool — lists all visits for a patient from BU5.
-    """
-    patient_id = await _extract_patient_id(query)
-    if not patient_id:
-        return [{"error": "Could not extract patient ID from query"}]
 
+    Args:
+        patient_id: The patient ID to look up
+
+    Returns:
+        List of visit records for the patient
+    """
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"{_BASE_URL}/visits/patient/{patient_id}",

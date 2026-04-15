@@ -97,11 +97,18 @@ class VisitService:
         updated = await self.visit_dao.find_by_id(visit_id)
 
         service_type = updated.service_type.value  # type: ignore[union-attr]
+        notes = updated.notes or ""
+        query = f"{service_type} checklist equipment exercises tools specific to: {notes}"
+        print(f"[claim_visit] query={query}", flush=True)
+        print(f"[claim_visit] service_type={service_type}, top_k={settings.rag_top_k}", flush=True)
         results = await self.vector_dao.search(
-            query=f"preparation checklist supplies equipment documentation for {service_type} home visit",
-            top_k=settings.rag_top_k,
+            query=query,
+            top_k=1,
             service_type=service_type,
         )
+        print(f"[claim_visit] got {len(results)} results", flush=True)
+        for i, r in enumerate(results):
+            print(f"[claim_visit] result[{i}] score={r.get('score', 'N/A')} text={r['text'][:100]}", flush=True)
         care_instructions = [r["text"] for r in results]
 
         return ClaimVisitResponse(

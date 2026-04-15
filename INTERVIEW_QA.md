@@ -76,13 +76,13 @@ The tool_executor uses `asyncio.gather` to call multiple tool functions concurre
 
 **Q11. Walk me through the full ingestion pipeline from file upload to a searchable vector in MongoDB Atlas.**
 
-A file is uploaded via `POST /ingest` on the ingestion_service. The orchestrator saves the file to a shared Docker volume and triggers an Airflow DAG run via the Airflow REST API, passing the file path, BU, and metadata in the DAG conf. The DAG runs five tasks sequentially: load (reads raw text from the file, handles PDF via pypdf), chunk (splits text into overlapping token-based chunks using tiktoken), embed (sends all chunks to OpenAI text-embedding-3-small in a single batch call, gets 1536-dimensional vectors back), store (inserts documents with text, embedding, and metadata into the correct BU's MongoDB collection), and notify (POSTs completion status back to the ingestion_service which sends a Slack notification).
+A file is uploaded via `POST /ingest` on the ingestion_service. The orchestrator saves the file to a shared Docker volume and triggers an Airflow DAG run via the Airflow REST API, passing the file path, BU, and metadata in the DAG conf. The DAG runs five tasks sequentially: load (reads raw text from the file, handles PDF via pypdf), chunk (splits text into overlapping token-based chunks using tiktoken), embed (sends all chunks to OpenAI gemini-embedding-001 in a single batch call, gets 1536-dimensional vectors back), store (inserts documents with text, embedding, and metadata into the correct BU's MongoDB collection), and notify (POSTs completion status back to the ingestion_service which sends a Slack notification).
 
 ---
 
 **Q12. Why do you use tiktoken for chunking instead of splitting by character count or sentence boundaries?**
 
-LLM context limits and embedding model limits are measured in tokens, not characters. A character-based split might cut in the middle of a word when encoded, or create chunks that are too long for the embedding model. Tiktoken uses the same tokenizer as the target model (cl100k_base for text-embedding-3-small), so chunk sizes are accurate. Sentence boundary splitting is better than character splitting but ignores token budget. Token-based chunking with overlap ensures each chunk fits within the embedding model's limit while preserving semantic continuity across chunk boundaries.
+LLM context limits and embedding model limits are measured in tokens, not characters. A character-based split might cut in the middle of a word when encoded, or create chunks that are too long for the embedding model. Tiktoken uses the same tokenizer as the target model (cl100k_base for gemini-embedding-001), so chunk sizes are accurate. Sentence boundary splitting is better than character splitting but ignores token budget. Token-based chunking with overlap ensures each chunk fits within the embedding model's limit while preserving semantic continuity across chunk boundaries.
 
 ---
 

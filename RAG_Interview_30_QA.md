@@ -25,7 +25,7 @@ It solves several core LLM limitations:
 
 1. Load documents from sources (PDFs, databases, APIs, etc.).
 2. Split documents into chunks (paragraphs, sentences, or fixed-size windows).
-3. Generate an embedding vector for each chunk using an embedding model (e.g., OpenAI `text-embedding-3-small`, Cohere Embed, or an open-source model like `all-MiniLM-L6-v2`).
+3. Generate an embedding vector for each chunk using an embedding model (e.g., OpenAI `gemini-embedding-001`, Cohere Embed, or an open-source model like `all-MiniLM-L6-v2`).
 4. Store the vectors along with the original text and metadata in a vector database (Pinecone, Weaviate, Chroma, pgvector, etc.).
 
 **Query time (online/per-request):**
@@ -40,7 +40,7 @@ It solves several core LLM limitations:
 
 ### 3. What are embeddings and why are they central to RAG? How does semantic similarity search work?
 
-Embeddings are dense numerical vectors (e.g., 384 or 1536 dimensions) that represent the *meaning* of a piece of text. Texts with similar meanings produce vectors that are close together in vector space, even if they use completely different words.
+Embeddings are dense numerical vectors (e.g., 384 or 1536 dimensions) that represent the _meaning_ of a piece of text. Texts with similar meanings produce vectors that are close together in vector space, even if they use completely different words.
 
 For example, "How do I reset my password?" and "I forgot my login credentials" would have very similar embedding vectors, even though they share almost no words.
 
@@ -50,7 +50,7 @@ Semantic similarity search works by:
 2. Comparing it against all stored chunk embeddings using a distance metric — usually **cosine similarity** (measures the angle between vectors) or **dot product**.
 3. Returning the chunks with the highest similarity scores.
 
-This is what makes RAG powerful over keyword search — it understands *intent*, not just exact word matches.
+This is what makes RAG powerful over keyword search — it understands _intent_, not just exact word matches.
 
 ---
 
@@ -58,12 +58,12 @@ This is what makes RAG powerful over keyword search — it understands *intent*,
 
 A vector database is purpose-built for storing, indexing, and querying high-dimensional vectors efficiently. Key differences:
 
-| Aspect | Relational DB (PostgreSQL) | Vector DB (Pinecone, Weaviate) |
-|--------|---------------------------|-------------------------------|
-| Data model | Rows and columns | Vectors + metadata |
-| Query type | SQL (exact match, range) | Nearest-neighbor similarity |
-| Indexing | B-tree, hash | HNSW, IVF, PQ |
-| Strength | Transactions, joins, ACID | Fast similarity search at scale |
+| Aspect     | Relational DB (PostgreSQL) | Vector DB (Pinecone, Weaviate)  |
+| ---------- | -------------------------- | ------------------------------- |
+| Data model | Rows and columns           | Vectors + metadata              |
+| Query type | SQL (exact match, range)   | Nearest-neighbor similarity     |
+| Indexing   | B-tree, hash               | HNSW, IVF, PQ                   |
+| Strength   | Transactions, joins, ACID  | Fast similarity search at scale |
 
 Popular options:
 
@@ -113,7 +113,7 @@ Grounding means tying the LLM's response to specific, verifiable source material
 
 RAG reduces hallucination by:
 
-1. **Providing evidence** — the LLM is given retrieved documents and instructed to answer *based on* them, not from general knowledge.
+1. **Providing evidence** — the LLM is given retrieved documents and instructed to answer _based on_ them, not from general knowledge.
 2. **Constraining the output** — the prompt typically says "Answer only based on the provided context. If the answer isn't in the context, say so."
 3. **Enabling verification** — because you know which chunks were retrieved, you can cite sources, letting users verify claims.
 
@@ -225,7 +225,7 @@ Research has shown that LLMs pay the most attention to information at the **begi
 
 Initial vector search (bi-encoder) is fast but approximate — it encodes the query and each document independently, then compares vectors. This can miss nuances.
 
-Re-ranking uses a **cross-encoder** — a model that takes the query and a candidate chunk *together* as input and produces a more accurate relevance score. This is much more compute-intensive (you can't do it over millions of documents), but very accurate over a small candidate set.
+Re-ranking uses a **cross-encoder** — a model that takes the query and a candidate chunk _together_ as input and produces a more accurate relevance score. This is much more compute-intensive (you can't do it over millions of documents), but very accurate over a small candidate set.
 
 **The two-stage pipeline:**
 
@@ -240,7 +240,7 @@ This gives you the speed of vector search with the accuracy of cross-encoding.
 
 ### 13. What is HyDE (Hypothetical Document Embeddings)?
 
-HyDE is a technique where instead of embedding the user's raw question for retrieval, you first ask the LLM to generate a **hypothetical answer** (without any context), then embed *that* answer and use it for retrieval.
+HyDE is a technique where instead of embedding the user's raw question for retrieval, you first ask the LLM to generate a **hypothetical answer** (without any context), then embed _that_ answer and use it for retrieval.
 
 **Why it works:** A hypothetical answer is linguistically closer to how the actual documents are written than a short question is. Questions and answers live in different semantic spaces. "What is the refund policy?" (question) is less similar to a policy document than "The refund policy allows returns within 30 days..." (hypothetical answer).
 
@@ -250,7 +250,7 @@ HyDE is a technique where instead of embedding the user's raw question for retri
 
 ### 14. How do metadata filters work in RAG?
 
-Metadata filters let you narrow the search space *before* doing vector similarity, combining structured filtering with semantic search.
+Metadata filters let you narrow the search space _before_ doing vector similarity, combining structured filtering with semantic search.
 
 **Example:** A legal RAG system with documents from multiple clients:
 
@@ -326,12 +326,15 @@ Most production systems use query rewriting — it's the simplest approach that 
 The user's raw question is often a poor search query. Query transformation techniques rewrite it for better retrieval:
 
 **Sub-question decomposition:** Break a complex question into simpler ones.
+
 - "Compare the pricing and features of Plan A vs Plan B" → two queries: "What is the pricing of Plan A?" and "What are the features of Plan B?"
 
 **Step-back prompting:** Ask a more general question first to get broader context.
+
 - "Why did revenue drop in Q3 2024?" → "What were the key financial events in 2024?"
 
 **Query expansion:** Add synonyms or related terms.
+
 - "EKS migration issues" → "EKS migration issues, Kubernetes AWS problems, container orchestration errors"
 
 **HyDE:** Generate a hypothetical answer and use it as the search query (covered in Q13).
@@ -394,7 +397,7 @@ The context window is the maximum number of tokens an LLM can process in a singl
 **Chunks too large (e.g., entire pages or sections):**
 
 - Rich context — each chunk has enough information for a complete answer.
-- But lower precision — the embedding averages out multiple topics, so the chunk might match queries about *any* of those topics weakly.
+- But lower precision — the embedding averages out multiple topics, so the chunk might match queries about _any_ of those topics weakly.
 - Wastes context window space — the LLM gets a lot of irrelevant text alongside the relevant bits.
 
 **The sweet spot** is typically 200–500 tokens with 10–20% overlap between consecutive chunks. But this varies by use case — highly structured FAQ content works well with small chunks, while narrative legal documents need larger ones to preserve reasoning chains.
@@ -409,7 +412,7 @@ The context window is the maximum number of tokens an LLM can process in a singl
 
 ### 21. What is agentic RAG?
 
-Agentic RAG wraps the RAG pipeline inside an AI agent that can make decisions about *how* to retrieve, *whether* to retrieve, and *when to stop*.
+Agentic RAG wraps the RAG pipeline inside an AI agent that can make decisions about _how_ to retrieve, _whether_ to retrieve, and _when to stop_.
 
 Instead of the rigid retrieve-once-then-generate pattern, an agent can:
 
@@ -445,7 +448,7 @@ This technique solves the chunk-size trade-off by using **small chunks for retri
 2. Split each parent into smaller "child" chunks (e.g., individual sentences or small paragraphs).
 3. Embed and index only the child chunks.
 4. At query time, retrieve the most similar child chunks.
-5. But instead of passing the child chunks to the LLM, look up their parent chunks and pass *those* instead.
+5. But instead of passing the child chunks to the LLM, look up their parent chunks and pass _those_ instead.
 
 **Why it works:**
 
@@ -510,7 +513,7 @@ Ask the LLM to return JSON with claims and their source IDs:
 {
   "answer": "Employees receive 20 days PTO...",
   "citations": [
-    {"claim": "20 days PTO", "source_id": "A", "chunk_text": "..."}
+    { "claim": "20 days PTO", "source_id": "A", "chunk_text": "..." }
   ]
 }
 ```
@@ -526,14 +529,17 @@ PII (Personally Identifiable Information) and PHI (Protected Health Information)
 **Where to place guardrails:**
 
 **Pre-retrieval:**
-- Redact PII/PHI from documents *before* indexing (names → [PERSON], SSNs → [REDACTED]).
+
+- Redact PII/PHI from documents _before_ indexing (names → [PERSON], SSNs → [REDACTED]).
 - Apply access-control metadata filters so users only retrieve documents they're authorized to see.
 
 **Post-retrieval:**
+
 - Scan retrieved chunks for PII/PHI before passing to the LLM.
 - Redact or mask sensitive fields in the chunks.
 
 **Post-generation:**
+
 - Scan the LLM's response for any PII/PHI that leaked through.
 - Use regex patterns (SSN, phone, email) + NER models (names, addresses) to detect and redact.
 
@@ -598,22 +604,26 @@ Multi-modal RAG retrieves from a corpus containing text, images, tables, diagram
 **Approaches:**
 
 **1. Convert everything to text:**
+
 - Use vision models to caption images and describe diagrams.
 - Use OCR + table extractors for scanned documents.
 - Embed the text descriptions alongside regular text chunks.
 - Limitation: loses visual information that's hard to describe in words.
 
 **2. Multi-modal embeddings (unified vector space):**
+
 - Use models like CLIP, OpenCLIP, or Voyage multimodal that embed both text and images into the same vector space.
 - A text query can retrieve relevant images, and vice versa.
 - Works well for image-text matching but may not capture fine-grained details.
 
 **3. Multi-modal LLM at generation time:**
+
 - Retrieve relevant images/documents as raw content (not just text).
 - Pass them directly to a multi-modal LLM (Claude, GPT-4V) that can "see" the images alongside text.
 - Most flexible but most expensive.
 
 **4. Hybrid pipeline:**
+
 - Maintain separate indexes for text and images.
 - Route queries to the appropriate index (or both).
 - Combine results before sending to a multi-modal LLM.
@@ -624,23 +634,25 @@ Multi-modal RAG retrieves from a corpus containing text, images, tables, diagram
 
 ### 29. Explain the difference between RAG and fine-tuning. When would you choose one over the other?
 
-| Aspect | RAG | Fine-tuning |
-|--------|-----|-------------|
-| Knowledge source | External documents at query time | Baked into model weights |
-| Update frequency | Instant (update the document store) | Requires retraining |
-| Cost | Per-query retrieval + generation | Upfront training cost |
-| Best for | Factual Q&A over specific documents | Changing model behavior/style/format |
-| Hallucination | Reduced (grounded in sources) | Can still hallucinate |
-| Data privacy | Documents stay in your control | Training data gets absorbed into weights |
-| Setup complexity | Vector DB + retrieval pipeline | Training infrastructure + dataset curation |
+| Aspect           | RAG                                 | Fine-tuning                                |
+| ---------------- | ----------------------------------- | ------------------------------------------ |
+| Knowledge source | External documents at query time    | Baked into model weights                   |
+| Update frequency | Instant (update the document store) | Requires retraining                        |
+| Cost             | Per-query retrieval + generation    | Upfront training cost                      |
+| Best for         | Factual Q&A over specific documents | Changing model behavior/style/format       |
+| Hallucination    | Reduced (grounded in sources)       | Can still hallucinate                      |
+| Data privacy     | Documents stay in your control      | Training data gets absorbed into weights   |
+| Setup complexity | Vector DB + retrieval pipeline      | Training infrastructure + dataset curation |
 
 **Choose RAG when:**
+
 - Knowledge changes frequently (policies, product docs, news).
 - You need citations and source attribution.
 - You need to work with private/proprietary data without modifying the model.
 - You want to avoid the cost and complexity of fine-tuning.
 
 **Choose fine-tuning when:**
+
 - You want to change the model's tone, format, or reasoning style.
 - The model needs to learn domain-specific patterns (medical terminology, legal reasoning style).
 - Latency is critical and you can't afford the retrieval step.
@@ -655,23 +667,27 @@ Multi-modal RAG retrieves from a corpus containing text, images, tables, diagram
 When source documents change, the vector index becomes stale. Strategies for keeping it in sync:
 
 **1. Full re-indexing:**
+
 - Re-chunk and re-embed everything on a schedule (nightly, weekly).
 - Simple but wasteful — most documents haven't changed.
 - Viable for small corpora (under 100K documents).
 
 **2. Incremental updates with change detection:**
+
 - Track document hashes or modification timestamps.
 - On each sync: detect new/modified/deleted documents.
 - Only re-embed the changed chunks; delete vectors for removed documents.
 - Requires a mapping between source documents and their vector IDs.
 
 **3. Versioned documents:**
+
 - Store a version field in chunk metadata.
 - When a document updates, add new chunks with a new version and keep old ones.
 - At query time, filter to the latest version.
 - Periodically garbage-collect old versions.
 
 **4. Event-driven pipeline:**
+
 - Source systems (CMS, S3, databases) emit events when documents change.
 - A pipeline listener picks up the event, re-chunks, re-embeds, and upserts to the vector DB.
 - Near real-time freshness.
@@ -679,5 +695,5 @@ When source documents change, the vector index becomes stale. Strategies for kee
 **Key challenges:**
 
 - **Chunk ID stability** — if you re-chunk a modified document, the new chunks might not align 1:1 with the old ones. Safest to delete all old chunks for that document and insert the new set.
-- **Embedding model changes** — if you upgrade your embedding model, you must re-embed the *entire* corpus because old and new vectors aren't comparable.
+- **Embedding model changes** — if you upgrade your embedding model, you must re-embed the _entire_ corpus because old and new vectors aren't comparable.
 - **Consistency** — during re-indexing, users might get results from a mix of old and new chunks. Use blue-green indexing (build a new index, then swap atomically) for zero-downtime updates.

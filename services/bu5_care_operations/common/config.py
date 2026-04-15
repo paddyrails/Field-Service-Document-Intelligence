@@ -6,8 +6,8 @@ class Settings(BaseSettings):
 
     mongodb_uri: str
     mongodb_db_name: str = "ritecare"
-    openai_api_key: str
-    openai_embedding_model: str = "text-embedding-3-small"
+    google_api_key: str
+    google_embedding_model: str = "gemini-embedding-001"
     rag_top_k: int = 5
 
     # Kafka

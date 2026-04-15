@@ -1,23 +1,31 @@
-import openai
 import os
+from google import genai
 
-_client = openai.AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
-async def embed_chunks(
+BATCH_SIZE = 100  # Google API limit
+
+
+def embed_chunks(
     chunks: list[str],
     bu: str,
     customer_id: str,
     service_type: str = "",
 ) -> list[dict]:
-    response = await _client.embeddings.create(
-        model="text-embedding-3-small",
-        input=chunks
-    )
+    all_embeddings: list[list[float]] = []
+
+    for i in range(0, len(chunks), BATCH_SIZE):
+        batch = chunks[i : i + BATCH_SIZE]
+        response = client.models.embed_content(
+            model="gemini-embedding-001",
+            contents=batch,
+        )
+        all_embeddings.extend([e.values for e in response.embeddings])
 
     return [
         {
             "text": chunks[i],
-            "embedding": response.data[i].embedding,
+            "embedding": all_embeddings[i],
             "metadata": {
                 "bu": bu,
                 "customer_id": customer_id,

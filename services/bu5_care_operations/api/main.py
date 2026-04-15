@@ -51,6 +51,7 @@ app = FastAPI(
     title="RiteCare BU5 - Care Operations",
     description="API for managing patient visits and care preparation documentation",
     version="0.1.0",
+    root_path="/bu5",
     lifespan=lifespan,
 )
 
