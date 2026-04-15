@@ -418,6 +418,36 @@ services:
     command: bash -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@ritecare.com || true && rm -f /opt/airflow/airflow-webserver.pid && airflow webserver --port 8080 & airflow scheduler & wait"
     restart: unless-stopped
 
+  # ── Portals ───────────────────────────────────────────────────────────────────
+
+  member_portal:
+    image: node:20-alpine
+    container_name: ritecare-member-portal
+    working_dir: /app
+    command: sh -c "npm install -g serve && serve -s build -l 3000"
+    volumes:
+      - ./portals/member-portal:/app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.member.rule=PathPrefix(`/member`)"
+      - "traefik.http.routers.member.entrypoints=web"
+      - "traefik.http.services.member.loadbalancer.server.port=3000"
+    restart: unless-stopped
+
+  admin_portal:
+    image: node:20-alpine
+    container_name: ritecare-admin-portal
+    working_dir: /app
+    command: sh -c "npm install -g serve && serve -s build -l 3001"
+    volumes:
+      - ./portals/admin-portal:/app
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin.rule=PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin.entrypoints=web"
+      - "traefik.http.services.admin.loadbalancer.server.port=3001"
+    restart: unless-stopped
+
 volumes:
   uploads:
   airflow_db:
