@@ -19,6 +19,8 @@ dependencies = [
     "slack-bolt>=1.20",
     "pypdf",
     "sentence-transformers>=3.0",
+    "tenacity>=8.0",
+    "pybreaker>=1.0",
 ]
 
 [project.optional-dependencies]
