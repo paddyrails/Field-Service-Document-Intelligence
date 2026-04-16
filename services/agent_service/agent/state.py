@@ -12,5 +12,6 @@ class AgentState(TypedDict):
     channel: str                  # Slack channel name
     bu_hint: NotRequired[str]     # BU pre-determined from channel mapping — skips LLM classifier
     final_response: str           # the composed answer, set by the responder node
+    blocked: NotRequired[bool]
 
     
