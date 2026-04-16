@@ -24,7 +24,7 @@ async def evaluate_relevance(
     Evaluate if the retrieved context is specifically relevant to the patient's condition
     described in the notes.
     Score from 0-10 where:
-    - 10 = perfectly mathes the specific condition in notes
+    - 10 = perfectly matches the specific condition in notes
     - 7 = reasonably relevant to the condition
     - 4 = generic/tangentially related
     - 0 = completely irrelevant
