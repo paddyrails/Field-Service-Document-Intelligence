@@ -11,6 +11,7 @@ import uvicorn
 from fastapi import Depends, FastAPI
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware  
 
 from agent.graph import agent
 from agent_api.dependencies import get_conversation_service
@@ -18,6 +19,13 @@ from service.conversation_service import ConversationService
 
 app = FastAPI(title="RiteCare Agent API", version="0.1.0")
 
+app.add_middleware(                                                             
+      CORSMiddleware,                                                             
+      allow_origins=["http://localhost:3000", "http://localhost:3001"],           
+      allow_credentials=True,                                                     
+      allow_methods=["*"],                                                        
+      allow_headers=["*"],                                                        
+  ) 
 
 class QueryRequest(BaseModel):
     query: str
