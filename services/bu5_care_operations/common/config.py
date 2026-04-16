@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     mongodb_db_name: str = "ritecare"
     google_api_key: str
     google_embedding_model: str = "gemini-embedding-001"
+    google_chat_model: str = "gemini-2.5-flash"
     rag_top_k: int = 5
 
     # Kafka

@@ -2,6 +2,7 @@ import uuid
 
 import uvicorn
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from google.adk.runners import Runner
 from google.genai import types
 from agent.agent import root_agent
@@ -9,6 +10,12 @@ from agent.session import MongoSessionService
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="RiteCare Agent API", version="2.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 session_service = MongoSessionService()
 runner = Runner(agent=root_agent, app_name="ritecare", session_service=session_service)
 

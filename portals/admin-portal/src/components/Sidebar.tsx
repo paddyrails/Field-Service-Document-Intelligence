@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import "./Sidebar.css";
 
 const menuItems = [
+  { label: "Onboarding", path: "/onboarding" },
   { label: "Members", path: "/members" },
   { label: "Support Tickets", path: "/support-tickets" },
   { label: "Billing & Subscription", path: "/billing" },

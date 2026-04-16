@@ -7,6 +7,7 @@ import Members from "./pages/Members";
 import SupportTickets from "./pages/SupportTickets";
 import Billing from "./pages/Billing";
 import Collections from "./pages/Collections";
+import Onboarding from "./pages/Onboarding";
 
 function App() {
   return (
@@ -20,7 +21,8 @@ function App() {
       />
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/collections" replace />} />
+          <Route path="/" element={<Navigate to="/onboarding" replace />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/members" element={<Members />} />
           <Route path="/support-tickets" element={<SupportTickets />} />
           <Route path="/billing" element={<Billing />} />
