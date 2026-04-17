@@ -1,5 +1,7 @@
 from langgraph.graph import END, StateGraph
-from langgraph.checkpoint.mongodb.aio import AsyncMongoDBSaver
+from langgraph.checkpoint.mongodb import MongoDBSaver
+from pymongo import MongoClient
+from shared.config import settings
 
 from agent.nodes.intent_classifier import intent_classifier
 from agent.nodes.tool_executor import tool_executor
@@ -17,10 +19,12 @@ def _route_after_output_guardrail(state: AgentState) -> str:
         return "retry"
     return "done"
 
+client = MongoClient(settings.mongodb_uri)
 
-checkpointer = AsyncMongoDBSaver(
+checkpointer = MongoDBSaver(
     connection_string=settings.mongodb_uri,
-    db_name=settings.database_name
+    db_name=settings.mongodb_db_name,
+    client=client
 )
 
 def build_graph():

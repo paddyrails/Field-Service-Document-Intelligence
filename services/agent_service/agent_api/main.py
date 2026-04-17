@@ -62,7 +62,7 @@ async def query(
         "bu_hint": request.bu_hint or "",
     }
 
-    result = await agent.ainvoke(state)
+    result = await agent.ainvoke(state, config)
     response = result.get("final_response", "Sorry, I could not generate a response.")
 
     await conv_service.save_turn(
