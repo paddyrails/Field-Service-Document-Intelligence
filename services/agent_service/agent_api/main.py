@@ -95,6 +95,31 @@ async def get_state_history(session_id: str):
         })
     return {"session_id": session_id, "check_points": snapshots}
 
+@app.get("/state/{session_id}")                                             
+async def get_current_state(session_id: str):                                 
+    """Get the latest state snapshot for a session."""
+    config = {"configurable": {"thread_id": session_id}}                      
+                                                                            
+    state = await agent.aget_state(config)  
+                                                                            
+    if not state.values:
+        return {"error": f"No state found for session {session_id}"}          
+                                                                            
+    return {                                                                  
+        "session_id": session_id,                                           
+        "checkpoint_id": state.config["configurable"].get("checkpoint_id"),
+        "node": state.next,  # which node would run next (empty if done)
+        "values": {                         
+            "blocked": state.values.get("blocked"),                           
+            "intent": state.values.get("intent", ""),
+            "final_response": state.values.get("final_response", ""),         
+            "grounding_retries": state.values.get("grounding_retries", 0),  
+            "message_count": len(state.values.get("messages", [])),           
+            "tool_results": state.values.get("tool_results", []),           
+        },                                                                    
+    } 
+
+
 
 if __name__ == "__main__":
     uvicorn.run("agent_api.main:app", host="0.0.0.0", port=8000, reload=False)
