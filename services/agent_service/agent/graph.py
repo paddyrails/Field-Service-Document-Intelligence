@@ -1,4 +1,7 @@
 from langgraph.graph import END, StateGraph
+from langgraph.checkpoint.mongodb import MongoDBSaver
+from pymongo import MongoClient
+from shared.config import settings
 
 from agent.nodes.intent_classifier import intent_classifier
 from agent.nodes.tool_executor import tool_executor
@@ -15,6 +18,14 @@ def _route_after_output_guardrail(state: AgentState) -> str:
     if not state.get("final_response") and state.get("grounding_feedback"):
         return "retry"
     return "done"
+
+client = MongoClient(settings.mongodb_uri)
+
+checkpointer = MongoDBSaver(
+    connection_string=settings.mongodb_uri,
+    db_name=settings.mongodb_db_name,
+    client=client
+)
 
 def build_graph():
 
@@ -51,6 +62,6 @@ def build_graph():
         }
     )    
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
 
 agent = build_graph()

@@ -50,20 +50,19 @@ async def query(
     request: QueryRequest,
     conv_service: ConversationService = Depends(get_conversation_service),
 ) -> QueryResponse:
-    history = await conv_service.load_history(request.session_id)
+    # history = await conv_service.load_history(request.session_id)
+
+    config = {"configurable": {"thread_id": request.session_id}}
 
     state = {
-        "messages": history + [HumanMessage(content=request.query)],
+        "messages": [HumanMessage(content=request.query)],
         "intent": "",
-        "tool_calls": [],
-        "tool_results": [],
         "session_id": request.session_id,
         "channel": request.channel,
         "bu_hint": request.bu_hint or "",
-        "final_response": "",
     }
 
-    result = await agent.ainvoke(state)
+    result = await agent.ainvoke(state, config)
     response = result.get("final_response", "Sorry, I could not generate a response.")
 
     await conv_service.save_turn(
