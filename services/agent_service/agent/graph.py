@@ -62,6 +62,9 @@ def build_graph():
         }
     )    
 
-    return graph.compile(checkpointer=checkpointer)
+    return graph.compile(
+        checkpointer=checkpointer,
+        interrupt_before=["execute_tools"]    
+    )
 
 agent = build_graph()
