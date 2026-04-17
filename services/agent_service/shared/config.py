@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     openai_chat_model:str = "gpt-4o-mini"
     openai_embedding_model: str = "text-embedding-3-small"
 
+    # langchain_tracing_v2: str = ""                                                
+    # langchain_api_key: str = ""                                                   
+    # langchain_project: str = ""
+
     #MongoDB
     mongodb_uri:str
     mongodb_db_name:str = "ritecare"

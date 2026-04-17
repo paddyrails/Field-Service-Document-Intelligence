@@ -4,6 +4,7 @@ from datetime import datetime
 from common.config import settings
 from common.exceptions.handlers import VisitNotFoundError
 from common.models.visit import ServiceType, Visit, VisitStatus
+from service.critic import evaluate_relevance, rewrite_query, MAX_RETRIES
 
 logger = logging.getLogger(__name__)
 from common.schemas.request import RAGSearchRequest, VisitClaimRequest, VisitCreateRequest, VisitStatusUpdateRequest
@@ -97,16 +98,41 @@ class VisitService:
         updated = await self.visit_dao.find_by_id(visit_id)
 
         service_type = updated.service_type.value  # type: ignore[union-attr]
-        results = await self.vector_dao.search(
-            query=f"preparation checklist supplies equipment documentation for {service_type} home visit",
-            top_k=settings.rag_top_k,
-            service_type=service_type,
-        )
-        care_instructions = [r["text"] for r in results]
+        notes = updated.notes or ""
+        query = f"{service_type} checklist equipment exercises tools specific to: {notes}"
+        print(f"[claim_visit] query={query}", flush=True)
+        print(f"[claim_visit] service_type={service_type}, top_k={settings.rag_top_k}", flush=True)
+        
+        results: list[dict] = []
+        for attempt in range(1, MAX_RETRIES + 1):
+            print(f"[critic] attempt {attempt}/{MAX_RETRIES} query={query}", flush=True)
+
+            results = await self.vector_dao.search(
+                query=query,
+                top_k=1,
+                service_type=service_type,
+            )
+            retrieved_texts = [r["text"] for r in results]
+
+            if not retrieved_texts:
+                print("[critic] no results, skipping", flush=True)
+                break
+
+            verdict = await evaluate_relevance(query, notes, service_type, retrieved_texts)
+            print(f"[critic] score={verdict['score']} verdict={verdict['verdict']} reason={verdict['reason']}", flush=True)
+
+            if verdict["verdict"] == "PASS":
+                break
+
+            if attempt < MAX_RETRIES:
+                query = await rewrite_query(query, notes, service_type, verdict["reason"])
+                print(f"[critic] rewritten query={query}", flush=True)
+
+        care_instructions = [r["text"] for r in results[:1]]
 
         return ClaimVisitResponse(
-            visit=self._to_response(updated),  # type: ignore[arg-type]
-            care_instructions=care_instructions,
+            visit=self._to_response(updated),
+            care_instructions=care_instructions
         )
 
     def _to_response(self, visit: Visit) -> VisitResponse:
