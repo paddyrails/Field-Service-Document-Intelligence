@@ -19,7 +19,9 @@ dependencies = [
     "structlog>=24.0",
     "slack-bolt>=1.20",
     "pypdf",
-    "langgraph.checkpoint.mongodb"
+    "langgraph.checkpoint.mongodb",
+    "pytest",
+    "pytest-asyncio"
 ]
 
 [project.optional-dependencies]

@@ -1,8 +1,49 @@
-# LangGraph Interview Questions & Answers
+# LangGraph Interview Questions
 
 ---
 
-## Core Concepts
+## Section 1: Questions
+
+---
+
+1. What is LangGraph and how does it differ from LangChain?
+2. What is a StateGraph and how does it work?
+3. How does state work in LangGraph? What happens when a node returns a partial state update?
+4. What are reducers in LangGraph state and why are they important?
+5. What is the difference between `add_edge` and `add_conditional_edges`?
+6. What does `graph.compile()` do and what is a CompiledGraph?
+7. How do you create cycles (loops) in LangGraph? Why is this significant?
+8. What is the `END` sentinel in LangGraph?
+9. What is checkpointing in LangGraph and why would you use it?
+10. What is the difference between MemorySaver and a persistent checkpointer like PostgresSaver?
+11. How does `thread_id` work in LangGraph's checkpointing?
+12. Can you replay or inspect intermediate states of a graph execution?
+13. How does LangGraph support human-in-the-loop patterns?
+14. What is the difference between `interrupt_before` and `interrupt_after`?
+15. How would you implement an approval step where a human reviews the agent's proposed tool calls before execution?
+16. What streaming modes does LangGraph support?
+17. How does token-level streaming work in LangGraph?
+18. What are subgraphs in LangGraph and when would you use them?
+19. How do you build a multi-agent system in LangGraph?
+20. How does state mapping work between a parent graph and a subgraph?
+21. How would you implement a reflection/self-correction loop in LangGraph?
+22. What is the `Send` API in LangGraph and how does it enable map-reduce patterns?
+23. How does error handling work in LangGraph nodes?
+24. What is `retry_policy` in LangGraph and how do you configure it?
+25. How does LangGraph handle parallel node execution?
+26. What is LangGraph Platform (formerly LangGraph Cloud)?
+27. How would you deploy a LangGraph agent in a production FastAPI application?
+28. How do you test a LangGraph graph?
+29. How does LangGraph integrate with LangSmith for observability?
+30. What are the key differences between LangGraph and other agent frameworks like CrewAI or AutoGen?
+
+---
+
+## Section 2: Questions & Answers
+
+---
+
+### Core Concepts
 
 ---
 
@@ -54,7 +95,7 @@ You create cycles by adding a conditional edge that routes back to a previous no
 
 ---
 
-## Checkpointing & Persistence
+### Checkpointing & Persistence
 
 ---
 
@@ -82,7 +123,7 @@ Yes. With checkpointing enabled, every node execution creates a checkpoint. You 
 
 ---
 
-## Human-in-the-Loop
+### Human-in-the-Loop
 
 ---
 
@@ -104,7 +145,7 @@ Add `interrupt_before=["execute_tools"]` when compiling the graph. When the grap
 
 ---
 
-## Streaming
+### Streaming
 
 ---
 
@@ -120,7 +161,7 @@ When using `stream_mode="messages"`, LangGraph intercepts the LLM's streaming ou
 
 ---
 
-## Subgraphs & Multi-Agent
+### Subgraphs & Multi-Agent
 
 ---
 
@@ -142,7 +183,7 @@ If the subgraph state schema is a subset of the parent schema, LangGraph automat
 
 ---
 
-## Advanced Patterns
+### Advanced Patterns
 
 ---
 
@@ -176,7 +217,7 @@ When multiple nodes have no dependency between them (e.g. after a fan-out from `
 
 ---
 
-## Deployment & Production
+### Deployment & Production
 
 ---
 
@@ -207,3 +248,36 @@ LangGraph is built on LangChain's `Runnable` interface, so it automatically emit
 **Q30. What are the key differences between LangGraph and other agent frameworks like CrewAI or AutoGen?**
 
 LangGraph is **low-level and explicit** — you define every node, edge, and state transition. This gives full control over execution flow, makes debugging straightforward, and avoids hidden magic. CrewAI is **high-level and role-based** — you define agents with roles and goals, and the framework handles orchestration. Good for rapid prototyping but harder to debug and customise. AutoGen focuses on **multi-agent conversation** — agents are defined as chat participants that talk to each other. LangGraph's advantage is predictability and composability — you can build any agent pattern (ReAct, plan-and-execute, reflection, multi-agent) using the same graph primitives, and you always know exactly what the execution path is.
+
+---
+
+## Section 3: Implemented in RiteCare
+
+> Checked against the actual codebase in `services/agent_service/`
+
+| # | Feature | Implemented | Where |
+|---|---------|:-----------:|-------|
+| 1 | StateGraph | :white_check_mark: | `agent/graph.py` — `StateGraph(AgentState)` |
+| 2 | State with TypedDict | :white_check_mark: | `agent/state.py` — `class AgentState(TypedDict)` |
+| 3 | Partial state updates | :white_check_mark: | All nodes return partial dicts |
+| 4 | Reducers (`add_messages`) | :white_check_mark: | `agent/state.py` — `Annotated[list[BaseMessage], add_messages]` |
+| 5 | `add_edge` | :white_check_mark: | `agent/graph.py` — 3 fixed edges (classify→tools→respond→guardrail) |
+| 6 | `add_conditional_edges` | :white_check_mark: | `agent/graph.py` — 2 conditional edges (input guardrail routing, output guardrail retry) |
+| 7 | `graph.compile()` | :white_check_mark: | `agent/graph.py` — `graph.compile(checkpointer=checkpointer)` |
+| 8 | Cycles / loops | :white_check_mark: | `agent/graph.py` — output_guardrail routes back to respond on grounding failure |
+| 9 | `END` sentinel | :white_check_mark: | `agent/graph.py` — blocked path and done path both reach `END` |
+| 10 | Checkpointing | :white_check_mark: | `agent/graph.py` — `MongoDBSaver` with MongoDB Atlas |
+| 11 | `thread_id` config | :white_check_mark: | `agent_api/main.py` — `{"configurable": {"thread_id": session_id}}` |
+| 12 | Human-in-the-loop | :x: | Not implemented — no `interrupt_before` / `interrupt_after` |
+| 13 | Streaming (`astream`) | :x: | Not implemented — only `ainvoke` used |
+| 14 | Subgraphs | :x: | Not implemented — single flat graph |
+| 15 | Multi-agent (supervisor/swarm) | :x: | Not implemented — single agent pattern |
+| 16 | Reflection / self-correction | :white_check_mark: | `agent/nodes/output_guardrail.py` — grounding retry loop with feedback to responder |
+| 17 | `Send` API (map-reduce) | :x: | Not implemented |
+| 18 | Error handling in nodes | :white_check_mark: | `agent/nodes/tool_executor.py` — try/except writes errors to `tool_results` |
+| 19 | `retry_policy` on nodes | :x: | Not implemented |
+| 20 | Parallel node execution | :x: | Not implemented — sequential node flow |
+| 21 | LangSmith integration | :x: | Not implemented — no `LANGCHAIN_TRACING_V2` configured |
+| 22 | LangGraph Platform | :x: | Not implemented — self-hosted via FastAPI + Docker |
+
+**Score: 13 / 22 features implemented**
