@@ -75,6 +75,26 @@ async def query(
 
     return QueryResponse(response=response, session_id=request.session_id)
 
+@app.get("/history/{session_id}")
+async def get_state_history(session_id: str):
+    """Replay all intermediate states for a session (time travel debugging)"""
+    config = {"configurable": {"thread_id": session_id}}
+
+    snapshots = []
+    async for state in agent.aget_state_history(config):
+        snapshots.append({
+            "checkpoint_id": state.config["configurable"].get("checkpoint_id"),
+            "node": state.metadata.get("source", "unknown"),
+            "step": state.metadata.get("step", -1),
+            "blocked": state.metadata.get("blocked"),
+            "intent": state.metadata.get("intent"),
+            "tool_results_count": len(state.metadata.get("tool_results", [])),
+            "final_response": state.metadata.get("final_response", ""),
+            "grounding_retries": state.metadata.get("grounding_retries", 0),
+            "message_count": len(state.metadata.get("messages", []))
+        })
+    return {"session_id": session_id, "check_points": snapshots}
+
 
 if __name__ == "__main__":
     uvicorn.run("agent_api.main:app", host="0.0.0.0", port=8000, reload=False)
