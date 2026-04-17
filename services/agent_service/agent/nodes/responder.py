@@ -43,6 +43,20 @@ async def responder(state: AgentState) -> dict:
         SystemMessage(content=context_message)
     ]
 
+    #if this is grounding retry, inject corrective feedback
+    grounding_feedback = state.get("grounding_feedback")
+    if grounding_feedback:
+        messages.append(
+            SystemMessage(
+                content=(
+                    f"Your previous response was flagged as not grounded in the retrived documents."
+                    f"Reason: {grounding_feedback}\n\n"
+                    f"Please regenerate your answer using ONLY information present in the retrieved data above."
+                    f"do not add any claims that are not directly supported by the provided content"
+                )
+            )
+        )
+
     response = await _llm.ainvoke(messages)
 
     updated_messages = list(state["messages"]) + [
