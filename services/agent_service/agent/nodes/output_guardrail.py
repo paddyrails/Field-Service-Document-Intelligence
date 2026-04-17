@@ -6,6 +6,13 @@ from shared.guardrails import check_grounding, redact_pii
 #Tool-result "type values from tool_executor that represent retrived docs"
 RAG_RESULT_TYPES = {"RAG", "rag", "search"}
 
+MAX_GROUNDING_RERIES = 1
+
+SAFE_RESPONSE = (
+    "I'm sorry, I couldn't find enough information in our document "
+    "to answer that reliably. Please contact support for further assistance"
+)
+
 def _extract_retrieved_docs(tool_results: list[dict]) -> list[str]:
     """
     Pull text chunks out of RAG tool results for grounding checks
@@ -40,6 +47,16 @@ async def output_guardrail(state: AgentState) -> dict:
     if docs and final.strip():
         verdict = await check_grounding(final, docs)
         if not verdict.get("grounded", True):
-            final += f"\n\n[Ungrounded: {verdict.get('reason', 'no reason given')}]"
+            retries = state.get("grounding_retries", 0)
+
+            if retries < MAX_GROUNDING_RERIES:
+                #send back to responder with feedback
+                return {
+                    "final_response": "",
+                    "grounding_retries": retries + 1,
+                    "grounding_feedback": verdict.get("reason", "Response not grounded in retrived documents")                    
+                }
+            #Max retries exhausted - return safe fallback
+            return {"final_response": SAFE_RESPONSE}            
 
     return {"final_response": final}

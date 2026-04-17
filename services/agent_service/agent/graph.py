@@ -10,6 +10,12 @@ from agent.state import AgentState
 def _route_after_input_guardrail(state:AgentState) -> str:
     return "blocked" if state.get("blocked") else "ok"
 
+def _route_after_output_guardrail(state: AgentState) -> str:
+    #if final_response was cleared and feedback exists -> retry
+    if not state.get("final_response") and state.get("grounding_feedback"):
+        return "retry"
+    return "done"
+
 def build_graph():
 
     graph = StateGraph(AgentState)
@@ -34,7 +40,16 @@ def build_graph():
     graph.add_edge("classify", "execute_tools")
     graph.add_edge("execute_tools", "respond")
     graph.add_edge("respond", "output_guardrail")
-    graph.add_edge("output_guardrail", END)
+
+    #Conditional: retry or finish
+    graph.add_conditional_edges(
+        "output_guardrail",
+        _route_after_output_guardrail,
+        {
+            "retry": "respond",
+            "done": END
+        }
+    )    
 
     return graph.compile()
 
