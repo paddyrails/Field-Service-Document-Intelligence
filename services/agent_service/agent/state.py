@@ -1,10 +1,11 @@
-from typing import NotRequired, TypedDict
+from typing import NotRequired, TypedDict, Annotated
 
 from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 
 class AgentState(TypedDict):
-    messages: list[BaseMessage]   # full conversation history (Langchain message format)
+    messages: Annotated[list[BaseMessage], add_messages]   # full conversation history (Langchain message format)
     intent: str                   # which BUs the query relates to, set by classifier or derived from bu_hint
     tool_calls: list[dict]        # tools the agent decided to call
     tool_results: list[dict]      # results returned from those calls

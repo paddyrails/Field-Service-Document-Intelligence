@@ -1,4 +1,5 @@
 from langgraph.graph import END, StateGraph
+from langgraph.checkpoint.mongodb.aio import AsyncMongoDBSaver
 
 from agent.nodes.intent_classifier import intent_classifier
 from agent.nodes.tool_executor import tool_executor
@@ -15,6 +16,12 @@ def _route_after_output_guardrail(state: AgentState) -> str:
     if not state.get("final_response") and state.get("grounding_feedback"):
         return "retry"
     return "done"
+
+
+checkpointer = AsyncMongoDBSaver(
+    connection_string=settings.mongodb_uri,
+    db_name=settings.database_name
+)
 
 def build_graph():
 
@@ -51,6 +58,6 @@ def build_graph():
         }
     )    
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
 
 agent = build_graph()
